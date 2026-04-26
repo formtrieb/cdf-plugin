@@ -59,7 +59,7 @@ claude plugin update cdf@cdf           # applies the update (restart required)
 | | Required | Optional |
 |---|---|---|
 | **Runtime** | Claude Code or Claude Desktop with MCP support; Node.js ≥ 20 | — |
-| **Figma access (T1 — REST)** | `FIGMA_PAT` env var (scope: `file_content:read`) | — |
+| **Figma access (T1 — REST)** | `FIGMA_PAT` env var **or** per-call `pat:` arg (scope: **File content — Read** minimum) — see [Figma PAT section below](#figma-personal-access-token-pat) for the full how-to | — |
 | **Figma access (T0 — runtime)** | `figma-console` MCP loaded + Figma Desktop with file open | — |
 | **Figma access (T2 — Variables)** | T1 PAT + Enterprise plan permissions for `GET /v1/files/{key}/variables` | — |
 | **Tokens regime** | — | DS-specific tokens MCP (e.g. `tokens-studio`) for `tokens-studio` regime |
@@ -70,6 +70,136 @@ The skill auto-detects the Figma tier (T0 / T1 / T2) — see
 table; the same table appears in
 `skills/cdf-profile-scaffold/SKILL.md` §0.
 
+## Figma Personal Access Token (PAT)
+
+The **T1 (REST)** path is the recommended setup for engineers — it's
+fast (~3 s walker pass on a mature DS) and doesn't require Figma
+Desktop to be running. It needs a Figma Personal Access Token.
+
+### 1. Create a PAT
+
+Go to <https://www.figma.com/settings> → **Personal access tokens**
+→ *Generate new token*. The dialog asks you to scope each capability;
+for the cdf plugin you need:
+
+| Scope | Required for | Notes |
+|---|---|---|
+| **File content — Read** | `cdf_fetch_figma_file`, `cdf_extract_figma_file` (`source: "rest"`) | Minimum scope. The vast majority of users only need this. |
+| **Variables — Read** | `cdf_resolve_figma_variables` (T2 path) | Enterprise plan only — non-Enterprise tokens silently get `null` from this endpoint. |
+| Comments / Webhooks / etc. | — | Leave **No access** — the cdf plugin doesn't use them. |
+
+The token format is `figd_…` followed by ~40 characters. Copy it
+**immediately after creation** — Figma won't show it again. If you
+lose it, regenerate.
+
+### 2. Provide the PAT to the plugin
+
+The cdf-mcp tools resolve the PAT in this order:
+**`pat:` arg → `FIGMA_PAT` env var → actionable error message.** Pick
+the delivery method that fits your workflow:
+
+#### Option A — Shell environment variable (engineer-friendly)
+
+Add the PAT to your shell rc so every Claude Code session inherits
+it. macOS / Linux with zsh:
+
+```bash
+# ~/.zshrc (or ~/.bashrc for bash)
+export FIGMA_PAT="figd_YOUR_TOKEN_HERE"
+```
+
+Then either `source ~/.zshrc` in an existing terminal or open a new
+one. **Fully quit Claude Code (Cmd+Q) and relaunch** so the MCP
+launcher picks up the new env. Verify:
+
+```bash
+echo $FIGMA_PAT | cut -c1-5    # Expect: figd_
+```
+
+This is the path the skills assume by default — when `FIGMA_PAT` is
+set, the scaffold/snapshot skills don't ask about authentication.
+
+#### Option B — Per-call `pat:` argument (designer-friendly, multi-account)
+
+If you'd rather not have a long-lived token in your shell rc — for
+example, you work across multiple Figma accounts and want to swap
+tokens per file — pass the PAT as an argument to the MCP tool when
+invoking the skill. Inside a Claude Code session:
+
+> Run `cdf_fetch_figma_file` against
+> `https://figma.com/design/abc123XYZ/My-DS` with
+> `pat: "figd_YOUR_TOKEN_HERE"`.
+
+The skill threads the arg through to the tool call. The arg-form
+**overrides** any `FIGMA_PAT` env var that's set, so you can keep a
+default token in the shell and override it per-run when needed.
+
+#### Option C — `.env` file in the DS dir (project-scoped)
+
+If your design-system repo already uses a `.env` for other secrets,
+add the PAT there and source it before launching Claude Code:
+
+```bash
+# <ds-repo>/.env  (DO NOT commit — make sure .gitignore covers .env)
+FIGMA_PAT=figd_YOUR_TOKEN_HERE
+```
+
+```bash
+cd <ds-repo>
+set -a && source .env && set +a    # exports each KEY=VALUE
+claude                              # CC inherits FIGMA_PAT
+```
+
+This is the same as Option A but scoped to one project — useful when
+you have one PAT per DS.
+
+### 3. Verify
+
+Inside a Claude Code session in your DS dir:
+
+> Run `cdf_fetch_figma_file({ file_key: "abc123XYZ" })` against my
+> Figma file. (Substitute `abc123XYZ` with the file key from your
+> Figma URL — the segment between `/design/` and the next slash.)
+
+Expect a JSON response with `cached: false` on first call (REST
+fetch) and `cached: true` on subsequent calls within the same DS
+dir (read from `.cdf-cache/figma/<file_key>.json`).
+
+If you get `Forbidden` or `Unauthorized`:
+
+- The PAT scope is wrong — regenerate with **File content — Read**.
+- The PAT is for an account that doesn't have access to the file —
+  open the file in Figma to confirm the account.
+- The PAT expired — Figma PATs don't expire by default, but if you
+  set an expiry on creation, regenerate.
+
+### 4. Security notes
+
+- **Never commit the PAT to git.** Add `.env` to `.gitignore` if
+  using Option C. Treat the token like a password.
+- **Revoke unused tokens** at <https://www.figma.com/settings>
+  (same page where you created it) — each token shows last-used
+  timestamp.
+- **One PAT per use case.** If you set up CI that uses cdf-mcp,
+  generate a separate CI-only PAT so you can revoke it without
+  breaking your local setup.
+- **Enterprise Variables access** uses the same PAT but requires
+  the Enterprise plan + the **Variables — Read** scope. Without
+  Enterprise, `cdf_resolve_figma_variables` falls back to the T1
+  REST file's partial Variables data (which is enough for most
+  scaffold passes).
+
+### Falling back to T0 (no PAT)
+
+If you can't or don't want to manage a PAT — for example, you're
+evaluating CDF on a file you only have read-access to via the Figma
+Desktop app — the T0 path works without auth. It requires the
+[`figma-console`](https://github.com/figma/figma-console-mcp)
+MCP loaded in your Claude session and Figma Desktop with the target
+file open. See `skills/cdf-profile-snapshot/SKILL.md` §1.4 for the
+T0 setup; performance is slower (~30–45 s walker pass on a mature
+DS, vs ~3 s for T1) but the output is shape-equivalent.
+
 ## Quickstart
 
 ```bash
@@ -77,11 +207,17 @@ table; the same table appears in
 claude plugin marketplace add formtrieb/cdf-plugin
 claude plugin install cdf@cdf
 
-# 2. cd into your design-system repo (or any dir where you want
+# 2. (T1 path — recommended) Set your Figma PAT in the shell, then
+#    fully quit + relaunch Claude Code so the MCP launcher inherits it.
+#    See the "Figma Personal Access Token (PAT)" section below for
+#    creation steps + scope requirements + alternative delivery methods.
+export FIGMA_PAT="figd_YOUR_TOKEN_HERE"
+
+# 3. cd into your design-system repo (or any dir where you want
 #    the Profile artefacts to land)
 cd ~/code/my-design-system
 
-# 3. Optional — seed a .cdf.config.yaml so the skill knows your
+# 4. Optional — seed a .cdf.config.yaml so the skill knows your
 #    Figma file and token-source regime up-front (see
 #    https://github.com/formtrieb/cdf#cdfconfigyaml-schema for shape).
 #    Note: leave `profile_path` commented out on first run — the
@@ -101,7 +237,7 @@ scaffold:
     path: ./tokens/
 EOF
 
-# 4. Launch Claude Code in this dir, then invoke a skill.
+# 5. Launch Claude Code in this dir, then invoke a skill.
 #    First-touch evaluation:
 #      /cdf:snapshot-profile
 #    Production-grade scaffold:
