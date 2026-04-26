@@ -21,15 +21,38 @@ diff, coverage, render, etc.).
 
 ## Install
 
+This is a single-plugin repo packaged as a one-entry **marketplace** —
+two-step install (Claude Code's `plugin install` expects a configured
+marketplace, not a bare GitHub URL):
+
 ```bash
-claude plugin install formtrieb/cdf-plugin
+# 1. Register the repo as a marketplace named "cdf"
+claude plugin marketplace add formtrieb/cdf-plugin
+
+# 2. Install the cdf plugin from the cdf marketplace
+claude plugin install cdf@cdf
 ```
 
-Both slash-commands appear immediately after install. The plugin's
+Verify:
+
+```bash
+claude plugin list | grep cdf
+# Expected: cdf@cdf   Version: 1.0.0   Status: ✔ enabled
+```
+
+Restart your Claude Code session after install — both slash-commands
+appear once the session re-discovers components. The plugin's
 `.mcp.json` declares an `npx`-launched `@formtrieb/cdf-mcp@^1.7.0`
 server, so the 22 CDF MCP tools are auto-available — no separate
 `npm install` required. First invocation may take ~5 s while npm
 caches the package; subsequent calls are local-cached.
+
+**Update later:**
+
+```bash
+claude plugin marketplace update cdf   # pulls latest from formtrieb/cdf-plugin
+claude plugin update cdf@cdf           # applies the update (restart required)
+```
 
 ## Prerequisites
 
@@ -50,8 +73,9 @@ table; the same table appears in
 ## Quickstart
 
 ```bash
-# 1. Install the plugin
-claude plugin install formtrieb/cdf-plugin
+# 1. Install the plugin (two-step — see "Install" above)
+claude plugin marketplace add formtrieb/cdf-plugin
+claude plugin install cdf@cdf
 
 # 2. cd into your design-system repo (or any dir where you want
 #    the Profile artefacts to land)
@@ -115,9 +139,15 @@ mode.
 
 ## Troubleshooting
 
+**`claude plugin install formtrieb/cdf-plugin` fails with "not found in any configured marketplace".**
+This is the expected error — the install path needs an already-registered
+marketplace. Use the two-step from the **Install** section above:
+`marketplace add formtrieb/cdf-plugin` first, then `install cdf@cdf`.
+
 **Plugin commands not appearing after install.**
 Restart your Claude Code session (or `claude --resume`-equivalent)
-to re-discover plugin components.
+to re-discover plugin components. On macOS, fully quitting the app
+before relaunching is more reliable than just closing the window.
 
 **`@formtrieb/cdf-mcp` first-call latency.**
 The first invocation of any `cdf_*` tool downloads the npm package

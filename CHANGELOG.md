@@ -6,6 +6,9 @@ underlying [`@formtrieb/cdf-core`](https://github.com/formtrieb/cdf-core)
 and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 — see [`.mcp.json`](.mcp.json) for the pinned MCP-server range.
 
+**Install:** see [`README.md`](README.md#install) — two-step
+(`marketplace add` → `install cdf@cdf`).
+
 ---
 
 ## 1.0.0 — 2026-04-26
