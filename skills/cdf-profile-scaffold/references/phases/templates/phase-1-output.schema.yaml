@@ -1,0 +1,180 @@
+# phase-1-output.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of the `phase-1-output.yaml` artefact produced on the
+# **T1 path** by the `cdf_extract_figma_file({source:"rest"})` MCP tool
+# (or the deprecated bash twin `scripts/extract-to-yaml.sh`). Exists as
+# documentation for skill maintainers and as the target shape the
+# walker emits. Version-tag (`schema_version`) is the sole runtime
+# guardrail — Phase 2 hard-fails on mismatch.
+#
+# Each field is annotated as:
+#   [walker]   — mechanically emitted by walker (cdf-core walkFigmaFile +
+#                emitPhase1Yaml; bash equivalents extract.sh / extract-to-yaml.sh)
+#   [resolver] — filled by the Phase-1.5 resolver (tokens-MCP / Plugin-
+#                cache / Enterprise REST). MAY be empty for MVP.
+#   [TBD]      — walker does not surface yet. Left empty with a TBD
+#                comment; fill later if/when walker is extended.
+#   [llm]      — LLM may append during Phase-1 review. Empty on initial
+#                emit. LLM MUST NOT modify fields marked [walker].
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-structured-intermediates.md
+#         + docs/plans/active/2026-04-23-lever-2a-phases-2-6.md (Scope-A rollout)
+#   - Skill: ../phase-1-orient.md §8
+#   - Producer: cdf_extract_figma_file MCP tool (cdf-core walker + emit);
+#               deprecated bash twin: scripts/extract-to-yaml.sh
+#   - Bash walker: scripts/figma-phase1-extract.sh (byte-stable, deprecated)
+#
+# `seeded_findings[]` entries below follow the canonical shape defined
+# in `seeded-findings.schema.yaml` (same directory). Per-field semantics
+# live there — the entries here only encode the Phase-1 thresholds.
+
+schema_version: phase-1-output-v1            # [walker] — Phase-2 hard-asserts
+
+generated_at: <ISO 8601 UTC>                 # [walker]
+generated_by:                                # [walker]
+  walker: packages/cdf-core/src/extractor/walker.ts        # bash twin: scripts/figma-phase1-extract.sh
+  transformer: packages/cdf-core/src/extractor/walker.ts   # bash twin: scripts/extract-to-yaml.sh
+  tier: T1
+
+# ── Raw walker data ────────────────────────────────────────────
+figma_file:                                  # [walker / TBD mix]
+  file_key: <string | null>                  # [TBD] walker input is path-only; caller supplies via .cdf.config.yaml
+  file_name: <string | null>                 # [walker] — extracted from `.name` of library.file.json
+
+# `ds_inventory:` is the canonical wrapper for raw + aggregate
+# inventory data per phase-1-orient.md §2 / §8. Phase 2 reads its
+# bulky entries directly via `.ds_inventory.component_sets.entries[]`
+# (no `phase_2_inputs:` paste-through anymore).
+ds_inventory:                                # [walker]
+  pages:                                     # [walker]
+    total: <int>                             # raw page count
+    content: <int>                           # pages whose childCount > 0
+    separator_or_meta: <int>                 # total − content
+
+  component_sets:                            # [walker]
+    total: <int>                             # indexed_count (from .componentSets metadata map)
+    tree_unique_count: <int>                 # deduped by id from walker tree traversal
+    remote_only_count: <int>                 # indexed − tree  (library refs not in this file's tree)
+    by_page:                                 # derived group-by from entries[].page
+      - name: <string>
+        count: <int>
+    entries: []                              # full per-set detail (propertyDefinitions etc.) — Phase 2 input
+
+  standalone_components: {}                  # [walker] — utility/documentation/widget/asset arrays
+
+  figma_component_descriptions:              # [walker]
+    with_description: <int>
+    without_description: <int>               # total − with_description
+    ratio: <float 0..1>                      # with_description / total (0.0 if total==0)
+
+  doc_frames_info: {}                        # [walker] — passthrough of documentation_surfaces.doc_frames
+
+libraries:                                   # [TBD]
+  # Walker does not currently enumerate linked library references. For MVP
+  # these fields are emitted with a TBD comment (see extract-to-yaml.sh
+  # §libraries-block). Extend the walker in a future iteration if the DS
+  # in question materially uses linked libraries.
+  linked: []                                 # [TBD]
+  remote_components: <int | null>            # [TBD] — distinct from component_sets.remote_only_count
+
+token_regime:                                # [TBD / caller]
+  detected: null                             # caller fills from .cdf.config.yaml scaffold.token_source.regime
+  evidence: []
+
+theming_matrix:                              # [resolver]
+  # Empty collections[] on MVP emit — Phase-1.5 resolver fills this
+  # (see phase-1-orient.md §8.2). Shape matches walker's theming_matrix
+  # stub in packages/cdf-core/src/extractor/walker.ts (bash twin: scripts/figma-phase1-extract.sh).
+  collections: []
+
+# ── Mechanically-seeded findings ───────────────────────────────
+# Emitted iff threshold conditions met. Each carries a
+# user_decision: pending field to be walked in Phase 6 via
+# AskUserQuestion (Rule-E COVERAGE contract, Lever 4).
+#
+# Thresholds are hardcoded in packages/cdf-core/src/extractor/walker.ts
+# (and the deprecated bash twin scripts/extract-to-yaml.sh) to match
+# phase-1-orient.md §5 / §8.3. Refactor to CLI flags only if a
+# future DS empirically needs different thresholds (see plan).
+seeded_findings:                             # [walker — conditional]
+  - id: "§A"                                 # iff with_description/total < 0.1
+    cluster: E                               # Documentation-gap cluster
+    title: "Systematic Figma-description gap"
+    observation: "<N> of <M> sets (<ratio-pct>%) carry a Figma description"
+    threshold_met: "with_description/total < 0.1"
+    sot_recommendation: >
+      If doc-frames cover the missing semantics → accept-as-divergence
+      (doc-frames are the SoT). Otherwise populate descriptions for
+      LLM-authoring downstream.
+    # Lever-5: cluster E is batch-eligible (§6.4-bis), so the walker
+    # emits default_if_unsure to unlock single-keystroke confirmation.
+    # plain_language + concrete_example are skipped (cluster E
+    # observations are mechanical counts, already plain).
+    default_if_unsure:
+      decision: accept-as-divergence
+      rationale: >
+        If doc-frames already carry the missing semantics, absent
+        Figma descriptions are by design — not a ship-blocker.
+    user_decision: pending
+
+  - id: "§C"                                 # iff remote_only_count > 0
+    cluster: A                               # Vocabulary-source cluster
+    title: "Remote-library drift"
+    observation: "<N> component sets resolve only from remote library"
+    threshold_met: "remote_only_count > 0"
+    sot_recommendation: >
+      Check whether the remote library is an explicit DS dependency
+      (vocabulary-source ≠ render-source by design) or a legacy
+      unresolved reference. Former: record in Profile; latter: backlog.
+    # Lever-5: cluster A REQUIRES plain_language + concrete_example +
+    # default_if_unsure per seeded-findings.schema.yaml. Walker emits
+    # all three so Phase-6 dialog can lead with DS-architect prose.
+    plain_language: >
+      <N> of <M> components in this Figma library resolve from a
+      remote library — not from this file's own tree. This can be
+      intentional (a foundation library shared across multiple design
+      systems) or legacy (a once-linked library whose components have
+      moved or been deprecated).
+    concrete_example: >
+      Counts: <N> of <M> total component sets are absent from the
+      file's own tree (indexed_count − tree_unique_count).
+    default_if_unsure:
+      decision: accept-as-divergence
+      rationale: >
+        Treating an external library as a vocabulary source is a
+        common DS pattern; default to accept so the Profile ships,
+        escalate only if the origin is genuinely unknown.
+    user_decision: pending
+
+  - id: "§Z-frame-named"                     # iff any component_set or standalone name ~ /^Frame \d+$/
+    cluster: Z                               # Housekeeping cluster
+    title: "Abandoned-work candidates (Frame-N pattern)"
+    observation: "<N> components match /^Frame \\d+$/"
+    instances: []                            # list of matching names
+    threshold_met: "pattern match count > 0"
+    sot_recommendation: >
+      Usually abandoned-work residue — default-named Figma frames
+      that were never renamed. Confirm with DS team; drop if stale.
+    user_decision: pending
+
+  - id: "§Z-page-ratio"                      # iff pages.total/content > 1.5
+    cluster: Z
+    title: "Separator/meta page dominance"
+    observation: "pages.total/content ratio = <ratio>"
+    threshold_met: "ratio > 1.5"
+    sot_recommendation: >
+      File-organisation signal. Verify doc-frame conventions and
+      whether separator-pages carry meaning (section headings) or
+      are pure whitespace.
+    user_decision: pending
+
+# ── LLM-additions zone ─────────────────────────────────────────
+# Empty on initial emit. LLM MAY append non-mechanical observations
+# during Phase-1 review (e.g. unusual naming pattern the walker
+# can't threshold-detect). MUST NOT contain nested data keys that
+# duplicate walker fields — that signals an intent violation.
+#
+# Phase 2 schema-checks: if this block is empty, it's safe to omit
+# from the emitted file entirely. Walker emits [] placeholder.
+interpretation: []                           # [llm]

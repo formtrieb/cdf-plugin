@@ -1,0 +1,540 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# USWDS — CDF Profile (fifth Big-DS foreign-DS pass, accessibility-first)
+# CDF Profile Format v1.0.0-draft.8
+#
+# Scope: Button + Alert only. The U.S. Web Design System is the federal
+# government's design system, built to WCAG 2.1 AA as a minimum and to
+# actively used accessibility practice as the norm. This Profile models
+# USWDS v3's flat Sass-token surface, sampling the subset Button and
+# Alert exercise. See BIG-DS-USWDS-BRIEF.md and findings.md
+# F-uswds-provisioning for source-of-truth replay data.
+#
+# Token-bridge strategy: (γ) via `standalone_tokens` per the F-shadcn-0
+# footnote clarification. USWDS's tokens are semantically flat
+# (`primary`, `primary-dark`, `accent-cool-darker`, `emergency` — single-
+# segment names accessed via Sass helpers like `color("primary-dark")`),
+# with NO dotted grammar. This matches shadcn's shape, not Primer's or
+# Material 3's. Brief tripwire was 35 entries for Button+Alert; final
+# count is 34 — under the threshold, standalone_tokens is the honest
+# mechanism (F-uswds-0).
+#
+# Ownership model: DS-owned defaults, consumer-overridable at Sass
+# compile time via `$theme-color-*` / `$theme-*` setting forks. This is
+# the **fifth ownership model** observed across the series:
+#   1. Radix (headless — no tokens)
+#   2. shadcn (consumer-owned CSS vars)
+#   3. Primer (DS-owned real DTCG)
+#   4. Material 3 (DS-owned toolchain-generated)
+#   5. USWDS (DS-owned, agency-overridable at compile time)
+# Prose-annotated in per-token descriptions; no new format surface
+# needed (F-uswds-0).
+#
+# Theming: empty (`modifiers: {}`). USWDS does NOT ship a runtime
+# Light/Dark toggle at DS level — its "dark mode" is per-component
+# `--inverse` variants applied when content sits on a dark background
+# (a CONTEXT, not a THEME). High-contrast mode is OS-signal-driven
+# (`@media (forced-colors: active)`); reduced-motion is OS-signal-driven
+# (`@media (prefers-reduced-motion)`). Neither is a DS-owned runtime
+# variant → neither belongs in `theming.modifiers`. This is the
+# F-primer-2 answer (F-uswds-theming): accessibility-preference axes
+# split into DS-owned (theming.modifiers territory — Material 3's
+# `contrast: [standard, medium, high]`) and OS-signal (§14.4 `css:`
+# escape-hatch territory — USWDS's forced-colors / reduced-motion).
+# CDF draft.8 already houses both; no new format category needed.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Identity ─────────────────────────────────────────────────────────────────
+
+name: USWDS
+version: "0.1.0-draft"
+cdf_version: ">=1.0.0-draft <2.0.0"
+dtcg_version: "2025.10"
+description: >
+  The United States Web Design System (USWDS) — federal-government
+  design system shipped by U.S. GSA. Only Button and Alert are modelled
+  — the brief's two-component test for the accessibility-first case.
+
+  Source-of-truth is the Sass token surface under
+  `packages/uswds-core/src/styles/tokens/` at commit
+  e3a67d19fc98193c753a445b568f99e939ae8342, sampled 2026-04-16. Tokens
+  are exposed to consumers via Sass helpers (`color("primary-dark")`,
+  `units(2)`, `radius("md")`) rather than as CSS custom properties;
+  a downstream DTCG emitter would flatten them at Sass compile time.
+  CDF treats the enumerated token surface as authoritative and is
+  agnostic to the emission mechanism.
+
+  Accessibility preferences (high-contrast, reduced-motion) are OS-
+  signal CSS media queries inside per-component Sass mixins
+  (`@media (forced-colors: active)`, `@media (prefers-reduced-motion)`);
+  they are NOT theme modifiers in USWDS's sense. The Profile declares
+  `theming.modifiers: {}` (empty) — USWDS has no DS-owned runtime
+  theme axes, a first across the Big-DS series.
+
+# ── Vocabularies ─────────────────────────────────────────────────────────────
+# USWDS's axis set differs from prior passes: instead of a single shared
+# `variant` vocabulary (shadcn / Material 3), USWDS's variants split
+# cleanly into button vs. alert. Plus two ARIA vocabularies declared
+# specifically to test F-Radix-4's "conditional ARIA by intent" question
+# — a Profile-level vocabulary for aria-live politeness and for
+# Alert's role polymorphism.
+
+vocabularies:
+
+  # ── Button-specific ──────────────────────────────────────────────────
+  button_variant:
+    description: >
+      USWDS Button's eight variants per
+      `packages/usa-button/src/styles/_usa-button.scss`.
+      `default` is the primary (blue) button with no explicit modifier
+      class; the other seven are `.usa-button--{name}` modifier classes.
+      `inverse` is a MODIFIER that combines with `outline` or
+      `unstyled` (see Component spec — F-uswds-inverse-variant for the
+      "variant that applies only in a context" question).
+    values: [default, secondary, accent-cool, accent-warm, base, outline, inverse, unstyled]
+
+  button_size:
+    description: >
+      USWDS Button's size axis. `default` is the baseline (padding
+      1.5u / 2.5u, md font size); `big` bumps padding to 2u / 3u and
+      font-size to `lg`. Implemented as the `.usa-button--big`
+      modifier class. Only two values (USWDS does not ship sm/md/lg
+      the way Material does).
+    values: [default, big]
+
+  # ── Alert-specific ──────────────────────────────────────────────────
+  alert_intent:
+    description: >
+      USWDS Alert's five canonical intents per
+      `packages/usa-alert/src/styles/_usa-alert.scss`'s `$alert-icons`
+      map. Each intent picks a distinct (background, border, icon)
+      token triple via the `alert-status-wrapper-styles` and
+      `alert-status-body-styles` Sass mixins. `emergency` is
+      visually and semantically the strongest — its background uses
+      the full `emergency` colour (not the `-lighter` variant that
+      info/success/warning/error use), and its ARIA wiring escalates
+      (see `aria_live_politeness` below).
+    values: [info, success, warning, error, emergency]
+
+  alert_variant_shape:
+    description: >
+      USWDS Alert's orthogonal shape modifiers. `slim` (reduced
+      vertical padding, smaller icon), `no-icon` (suppresses the icon
+      element), `validation` (form-embedded alert with a nested
+      checklist). Composes with `alert_intent` — any intent can be
+      slim / no-icon / a validation. Declared as a vocabulary rather
+      than individual booleans to keep the property axis enumerable.
+    values: [default, slim, no-icon, validation]
+
+  # ── ARIA vocabularies — the F-Radix-4 stress test ────────────────────
+  # This pass re-opens F-Radix-4 (conditional ARIA) with real two-DS
+  # evidence. USWDS Alert maps five intents to TWO role values and
+  # THREE aria-live values — a three-layer conditional expression.
+  # Declaring these as Profile vocabularies lets Component specs
+  # reference them symbolically in `aria:` narrative strings and in
+  # any future structured-ARIA grammar (reserved for v1.0.0 final per
+  # Component §15.3).
+  #
+  # F-uswds-aria-vocabularies tracks the observation: making
+  # `role_status_or_alert` + `aria_live_politeness` first-class
+  # vocabularies doesn't require a format change, but IT DOES
+  # demonstrate that §15 conditional ARIA can be expressed fully
+  # symbolically today.
+
+  role_status_or_alert:
+    description: >
+      ARIA role values legal for USWDS Alert. `status` is an implicit
+      "polite" live region (Alert's info / success intents);
+      `alert` is an implicit "assertive" live region (Alert's warning
+      / error / emergency intents). Per W3C WAI-ARIA 1.2, these roles
+      carry their own default `aria-live` semantics, so the explicit
+      `aria-live` attribute may be elided — but USWDS's implementation
+      makes it explicit for consistency, which is what the Component
+      spec's `aria:` narrative captures.
+    values: [status, alert]
+
+  aria_live_politeness:
+    description: >
+      WAI-ARIA `aria-live` attribute values. `off` (not a live
+      region), `polite` (announced when user is idle), `assertive`
+      (announced immediately, interrupting). USWDS Alert wires these
+      per intent: info/success → polite; warning/error → polite
+      (some implementations use assertive); emergency → assertive.
+      Declared at Profile level so any future live-region-shaped
+      component (Toast, Snackbar) can reuse the same vocabulary with
+      the same values.
+    values: [off, polite, assertive]
+
+# ── Token Grammar ────────────────────────────────────────────────────────────
+# Empty. USWDS ships flat single-segment Sass-key tokens (`primary-dark`,
+# `accent-cool-darker`, `info-lighter`, `emergency`), not a dotted
+# grammar. The draft.6 §6.1 blessing ("A Profile with no visual
+# contract MAY declare `token_grammar: {}`") covers this — same path
+# as shadcn. Downstream component `tokens:` blocks reference the
+# standalone_tokens paths below directly.
+#
+# A more systematic USWDS could declare a grammar like
+# `color.{family}.{step}` where family ∈ {primary, secondary, accent-
+# cool, accent-warm, base, info, success, warning, error, emergency,
+# disabled} and step ∈ {lightest, lighter, light, base, dark, darker,
+# darkest, vivid} — but that grammar has dense irregular sparsity
+# (emergency has no -lighter; disabled only has -lighter/-light;
+# each alert intent only uses a subset of steps). Enumerating
+# standalone_tokens is the more honest encoding — you see exactly
+# which cells exist, and the names match USWDS's Sass keys 1:1.
+
+token_grammar: {}
+
+token_layers: []
+
+# ── Standalone Tokens — the (γ) bridge ──────────────────────────────────────
+# 32 entries. Flat dot-separated paths mirror USWDS's Sass-helper
+# single-segment keys: `color("primary-dark")` → `color.primary-dark`.
+# Hyphen-inclusive segment names are legal per Profile §6.11 (token
+# paths are dot-separated; segments may contain hyphens).
+#
+# Every description begins with "USWDS-owned" to distinguish from
+# shadcn's "external —" consumer-owned pattern. The follow-up clause
+# "consumer-overridable via `$theme-{family}-{step}` Sass variable at
+# compile time" signals the fifth ownership model (F-uswds-0).
+
+standalone_tokens:
+
+  # ── Primary (Button default variant) ───────────────────────────────────
+  color.primary:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-primary` at
+      Sass compile time. Default Button background (variant=default);
+      Outline Button stroke colour. Default value: "#005ea2" (USWDS
+      "blue-60v").
+  color.primary-dark:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-primary-dark`.
+      Button hover state for variant=default; Outline Button hover
+      stroke. Darker tone than `primary`.
+  color.primary-darker:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-primary-darker`.
+      Button active/pressed state for variant=default; Outline Button
+      active stroke.
+
+  # ── Secondary ──────────────────────────────────────────────────────────
+  color.secondary:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-secondary`.
+      Button background for variant=secondary. Default value: red-50
+      family (USWDS "red-warm-50").
+  color.secondary-dark:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-secondary-dark`.
+      Button hover state for variant=secondary.
+  color.secondary-darker:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-secondary-darker`.
+      Button active/pressed state for variant=secondary.
+
+  # ── Accent Cool (teal family) ─────────────────────────────────────────
+  color.accent-cool:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-accent-cool`.
+      Button background for variant=accent-cool. Default is a teal/
+      cyan accent paired with secondary as the "cool warm" accent pair.
+  color.accent-cool-dark:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-accent-cool-dark`.
+      Button hover state for variant=accent-cool.
+  color.accent-cool-darker:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-accent-cool-darker`.
+      Button active/pressed state for variant=accent-cool.
+
+  # ── Accent Warm (gold family) ─────────────────────────────────────────
+  color.accent-warm:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-accent-warm`.
+      Button background for variant=accent-warm. Default is a gold/
+      orange accent.
+  color.accent-warm-dark:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-accent-warm-dark`.
+      Button hover state for variant=accent-warm.
+  color.accent-warm-darker:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-accent-warm-darker`.
+      Button active/pressed state for variant=accent-warm.
+
+  # ── Base (neutral greyscale) ──────────────────────────────────────────
+  color.base:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-base`.
+      Button background for variant=base (neutral-grey button).
+      Default value: mid-grey ("gray-50").
+  color.base-dark:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-base-dark`.
+      Button hover state for variant=base.
+  color.base-darker:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-base-darker`.
+      Button active/pressed state for variant=base.
+  color.base-lighter:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-base-lighter`.
+      Inverse Outline Button stroke colour (for Button variant=inverse
+      on dark backgrounds); link-reverse-color default resolution.
+  color.base-lightest:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-base-lightest`.
+      Default Alert background (intent=none — the Alert base mixin
+      background when no explicit intent variant is applied).
+
+  # ── Disabled (Button disabled state) ──────────────────────────────────
+  color.disabled:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-disabled-family`.
+      Disabled button text and outlined-disabled text.
+  color.disabled-light:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-disabled-light`.
+      Inverse outlined-disabled stroke colour — lighter disabled tone
+      legible on dark backgrounds.
+  color.disabled-lighter:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-disabled-lighter`.
+      Outlined-disabled stroke colour on light backgrounds.
+
+  # ── Alert intents (5 backgrounds + 4 borders — emergency reuses) ──────
+  # USWDS's alert mixin pattern: background = "{intent}-lighter" except
+  # emergency which uses "emergency" directly (no -lighter). Border-left
+  # = "{intent}" for all five.
+  color.info:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-info`.
+      Alert border-left colour for intent=info.
+  color.info-lighter:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-info-lighter`.
+      Alert background colour for intent=info.
+  color.success:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-success`.
+      Alert border-left colour for intent=success.
+  color.success-lighter:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-success-lighter`.
+      Alert background colour for intent=success.
+  color.warning:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-warning`.
+      Alert border-left colour for intent=warning.
+  color.warning-lighter:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-warning-lighter`.
+      Alert background colour for intent=warning.
+  color.error:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-error`.
+      Alert border-left colour for intent=error.
+  color.error-lighter:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-error-lighter`.
+      Alert background colour for intent=error.
+  color.emergency:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-color-emergency`.
+      Alert BOTH background AND border-left for intent=emergency —
+      the only intent where background is the full-strength colour
+      rather than the `-lighter` variant. Emergency is USWDS's
+      highest-severity visual treatment and pairs with role="alert"
+      + aria-live="assertive" (see Alert Component spec §15).
+
+  # ── Universal palette colours ─────────────────────────────────────────
+  color.white:
+    dtcg_type: color
+    description: >
+      USWDS-owned palette-literal colour. White (#ffffff). Button
+      visited-link colour; text colour on dark buttons; inverse-link
+      active/hover resolution per `$theme-link-reverse-hover-color`.
+  color.ink:
+    dtcg_type: color
+    description: >
+      USWDS-owned; alias for `base-darkest` (theme-color-base-darkest).
+      Default body text colour — applied by the Alert text mixin when
+      the Alert background is light. Contrast-paired with
+      `base-lightest` at WCAG 2.1 AA (USWDS's contract).
+  color.transparent:
+    dtcg_type: color
+    description: >
+      USWDS-owned palette-literal. CSS `transparent` keyword. Applied
+      as Button background for variant=outline / variant=unstyled
+      (no fill); also used for disabled-outline override.
+
+  # ── Focus ring ────────────────────────────────────────────────────────
+  color.focus:
+    dtcg_type: color
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-focus-color`.
+      Focus-visible outline ring colour applied via the `focus-outline`
+      mixin in `packages/uswds-core/src/styles/mixins/general/focus-outline.scss`.
+      Default value: USWDS "blue-40v" — a high-contrast accessible
+      blue meeting WCAG 2.4.7 non-text contrast guidelines. Single-
+      ring focus indicator per §13.5.1 (fourth-DS data point —
+      F-uswds-focus).
+
+  # ── Radius ────────────────────────────────────────────────────────────
+  radius.md:
+    dtcg_type: dimension
+    description: >
+      USWDS-owned; consumer-overridable via `$theme-button-border-radius`.
+      Button border-radius default value. Resolves via `radius("md")`
+      Sass helper to 0.25rem (4px) in the default USWDS shape scale.
+      Applied uniformly across all Button variants and sizes — USWDS
+      does not ship a shape axis (F-uswds-shape — no shape theme).
+
+# ── Theming ──────────────────────────────────────────────────────────────────
+# Empty modifiers block. USWDS has NO DS-owned runtime theme axes:
+#   - No Light/Dark toggle at DS level (dark-background is per-component
+#     context, not a theme; agencies can retint but not runtime-switch).
+#   - No contrast axis at DS level (high-contrast is browser-signal-
+#     driven via `@media (forced-colors: active)` in Sass mixins, not
+#     a DS-selectable variant).
+#   - No motion axis at DS level (reduced-motion is browser-signal-
+#     driven via `@media (prefers-reduced-motion)` in the `u-transition`
+#     Sass mixin, not a DS-selectable variant).
+#
+# This is a FIRST across the Big-DS series — every prior pass had at
+# least a `semantic: [Light, Dark]` axis. USWDS genuinely owns no
+# runtime theme dimensions. The empty `modifiers: {}` block is the
+# honest encoding. See F-uswds-theming in findings.md for the
+# observation, and F-primer-2 resolution: CDF's `theming.modifiers`
+# is for DS-OWNED runtime variants; OS-signal accessibility axes
+# belong in §14.4 `css:` escape hatch per draft.8.
+
+theming:
+  modifiers: {}
+  set_mapping: {}
+
+# ── Naming ───────────────────────────────────────────────────────────────────
+# `us` is short, lowercase, disjoint from `ft` / `mp` / `rdx` / `sh` /
+# `pr` / `m3`. USWDS's own CSS prefix is `usa-*`; `us` is a shortening
+# to match the Profile identifier convention of other foreign-DS tests.
+
+naming:
+  identifier: us
+  casing:
+    component_names: PascalCase
+    properties: camelCase
+    token_paths: kebab-case
+  reserved_names: {}
+
+# ── Interaction Patterns ─────────────────────────────────────────────────────
+# Two patterns: `pressable` (Button — four-state with focus collapsed
+# into the focus-visible ring), `static` (Alert — non-interactive
+# surface, one state; close button is a separate IconButton composition
+# out of scope). USWDS does not have Material-style focus-as-token-
+# backed-state; focus is a ring treatment via the `focus-outline`
+# mixin, not a distinct colour-token state variant.
+
+interaction_patterns:
+
+  static:
+    description: >
+      Non-interactive — one state. USWDS Alert lives here. Alert's
+      close button is a separate interactive child; this `static`
+      applies to the Alert surface itself.
+    states: [enabled]
+
+  pressable:
+    description: >
+      Click / tap activation via native `<button>` or
+      `<button aria-disabled="true">` form. USWDS Buttons implement
+      this via pseudo-class selectors (`:hover`, `:active`) plus
+      explicit utility classes (`.usa-button--hover`,
+      `.usa-button--active`) for demo / forcing state. Four states
+      map to three token resolutions (`rest`, `hover`, `active` —
+      disabled uses the `button-disabled` mixin which resolves to
+      `color.disabled` text on a translucent `base-lighter` fill).
+    states: [enabled, hover, pressed, disabled]
+    promoted: [disabled]
+
+# ── Accessibility Defaults ───────────────────────────────────────────────────
+# Per-category baselines. USWDS is WCAG 2.1 AA by design; these
+# defaults capture the category-wide invariants. Per-Component
+# `accessibility:` blocks layer on top.
+
+accessibility_defaults:
+
+  focus_ring:
+    description: >
+      Single-ring focus indicator via the `focus-outline` mixin.
+      Ring colour is `color.focus` (USWDS `$theme-focus-color`,
+      default "blue-40v"); ring width is 0.25rem (`$theme-focus-width`
+      default `0.5` units); outline-offset is 0.25rem. Applied via
+      `:focus-visible` (not `:focus`) on interactive elements.
+      Fourth-DS data point for the single-ring pattern noted in
+      §13.5.1 (after shadcn, Primer, Material 3). No structural
+      surface needed (F-uswds-focus).
+    pattern: single-ring
+    token_group: color.focus
+
+  category_defaults:
+    Status:
+      focus_visible: false
+      element: div
+    Interactive:
+      focus_visible: true
+      element: button
+      keyboard: pressable
+
+# ── Categories ───────────────────────────────────────────────────────────────
+# Status (Alert) and Interactive (Button). No Primitive / Layout / Overlays
+# needed for this two-component scope.
+
+categories:
+
+  Status:
+    description: >
+      Non-interactive status / notification components. USWDS Alert
+      lives here. Renders one state; intent-driven colour + ARIA role
+      polymorphism (status ↔ alert) + aria-live politeness (polite ↔
+      assertive) — see Alert Component spec §15 for the F-Radix-4
+      conditional-ARIA stress test.
+    interaction: static
+    examples: [Alert]
+
+  Interactive:
+    description: >
+      User-input components. USWDS Button lives here. Eight variants
+      × two sizes × pressable state coverage. Touch-target (WCAG 2.5.5
+      ≥44×44 CSS pixels) emerges from padding + line-height — not a
+      token, not declared. See F-uswds-touch-target in findings.md.
+    interaction: pressable
+    examples: [Button]

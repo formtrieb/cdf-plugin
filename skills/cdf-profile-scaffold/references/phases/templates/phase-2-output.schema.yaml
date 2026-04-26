@@ -1,0 +1,152 @@
+# phase-2-output.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of the `phase-2-output.yaml` artefact produced on the
+# **T1/T2 path** by Phase 2 (Vocabularies). T0 retains the legacy
+# `<ds>.phase-2-notes.md` markdown — see SKILL.md §3 phase-table caveat.
+#
+# Field annotations:
+#   [walker]   — set mechanically via the inline jq snippets in
+#                phase-2-vocabularies.md §1 Step 2.0-bis. LLM MUST NOT
+#                modify these values once emitted.
+#   [llm]      — LLM-authored: synthesis, rationale, classification.
+#   [phase-6]  — populated downstream during Phase-6 aggregation.
+#
+# Each `seeded_findings[]` entry follows `seeded-findings.schema.yaml`
+# (same directory). Phase 6 hard-asserts `schema_version`.
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-phases-2-6.md
+#   - Skill: ../phase-2-vocabularies.md §1 / §2
+#   - Producer: inline jq + LLM synthesis (no dedicated script)
+#   - Consumer: Phase 3 (.phase_3_inputs.system_vocabularies) and Phase 6
+#               (yq ea '.seeded_findings[]' phase-*-output.yaml)
+
+schema_version: phase-2-output-v1            # [walker] — Phase 6 hard-asserts
+
+generated_at: <ISO 8601 UTC>                 # [walker] (LLM stamps on emit)
+generated_by:                                # [walker]
+  source_phase_1: <relative path to phase-1-output.yaml>
+  tier: T1                                   # mirrors phase-1-output.generated_by.tier
+
+# ── Mechanical aggregation (walker via inline jq) ──────────────
+# axis_inventory is a flat enumeration of every property-axis surfaced
+# in phase-1-output.ds_inventory.component_sets.entries[*]. The jq
+# snippet in phase-2-vocabularies.md §Step 2.0-bis emits this directly;
+# LLM MUST NOT edit individual entries.
+axis_inventory:                              # [walker]
+  - axis: <string>                           # raw axis name (e.g. "type", "state")
+    type: VARIANT                            # VARIANT | BOOLEAN | TEXT | INSTANCE_SWAP
+    components_using: <int>                  # how many component_sets carry this axis
+    all_options: [<string>, ...]             # union of variantOptions (VARIANT only)
+    per_component:                           # full breakdown — Phase 6 evidence trail
+      - component: <string>
+        options: [<string>, ...]             # this component's variantOptions
+
+# ── LLM synthesis ──────────────────────────────────────────────
+# system_vocabularies is the headline output: the proposed unified
+# vocabulary set after §2.2 axis-aggregation. LLM-authored from
+# axis_inventory + decomposition_proposals.
+system_vocabularies:                         # [llm]
+  hierarchy: [<string>, ...]
+  intent: [<string>, ...]
+  size: [<string>, ...]
+  state: [<string>, ...]                     # base interaction states only
+  selected: boolean
+  expanded: boolean
+  validation: [<string>, ...]
+  hasValue: boolean
+  progress: [<string>, ...]
+  # …add DS-specific axes that surfaced in axis_inventory only — do
+  # not invent universal vocabs.
+
+# clash_matrix shows how each proposed vocab is currently realised
+# per-component. Used by Phase 3's path-shape matching + as evidence
+# for Phase 6 SoT decisions.
+clash_matrix:                                # [llm]
+  <vocab>:
+    <component>: [<value>, ...]              # values this component uses for this vocab
+
+# decomposition_proposals are the §2.3–§2.9 Advisor moments. Each kind
+# has a fixed shape; LLM fills `rationale` + `proposed_replacement`.
+# Mechanical-seed kinds (compound-value-folding, casing-drift,
+# generic-name, state-axis-overload) have `affected_axes` pre-filled
+# by the inline jq seeders.
+decomposition_proposals:                     # [walker (kind+affected_axes) + llm (rationale)]
+  - kind: state-axis-decomp                  # § enum:
+                                             #   state-axis-decomp
+                                             #   property-name-drift
+                                             #   active-ambiguity
+                                             #   selection-inconsistency
+                                             #   property-explosion
+                                             #   compound-value-folding
+                                             #   type-overloading
+                                             #   slot-primitive
+                                             #   casing-drift
+                                             #   generic-name
+    title: <string>                          # [walker | llm]
+    affected_axes: [<axis-name>, ...]        # [walker] seeded; [llm] may extend
+    rationale: <string>                      # [llm]
+    proposed_replacement:                    # [llm] free-shape per kind
+      ...
+
+# ── Mechanically-seeded findings ───────────────────────────────
+# Emitted by the inline jq snippets when their thresholds match. LLM
+# MUST NOT remove or rewrite these entries; LLM MAY append additional
+# findings that the jq pipeline cannot detect (selection-inconsistency,
+# active-ambiguity, etc. — the §2.5–§2.8 Advisor moments). All entries
+# follow `seeded-findings.schema.yaml`.
+#
+# Mechanical seeds (deterministic):
+#   §B1 (cluster C) — state-axis overload (component has both `state`
+#                     AND `interaction` axes). Seeded only when ≥1 hit.
+#   §B2 (cluster C) — property-name drift (axes whose option-sets
+#                     overlap > 50% with another axis).
+#   §Z-compound-value-fold (cluster Z) — variantOptions containing
+#                     `-` or `+` separators.
+#   §Z-casing-drift (cluster Z) — axis names differing only in case
+#                     across DS.
+#   §Z-generic-name (cluster Z) — axis name matching `/^Property \d+$/`.
+#   §Z-typo (cluster Z) — Levenshtein-distance-1 duplicates within an
+#                     axis's variantOptions. OPTIONAL: jq has no native
+#                     edit-distance op; if the inline pipeline can't
+#                     express it cleanly, leave to LLM review (Step 2.6
+#                     fallback).
+#   §Z-vocab-overlap-<value> — cluster `Z` for boolean-axis collisions
+#                     (`"false"` / `"true"` spanning N vocabs — standard
+#                     DS idiom); cluster `C` for semantic-concept
+#                     collisions (e.g. `none` across intent/validation,
+#                     `base` across size/density). Seeded by the
+#                     post-synthesis vocab-isolation check
+#                     (phase-2-vocabularies.md §2.9.5) — operates on
+#                     the LLM-synthesized system_vocabularies, not raw
+#                     walker data, so runs AFTER §2.2 grouping.
+#   §Z-vocab-near-miss-<pattern> — cluster `C` for genuine near-misses
+#                     (state↔interaction, case-variant axes,
+#                     leading/trailing↔left/right, axis/value homonyms,
+#                     hierarchy-family overload, brand cross-axis);
+#                     cluster `Z` for boolean-idiom acceptance
+#                     (≥2 boolean axes — informational). Seeded by the
+#                     L2A near-miss lint (scripts/lint-vocab-near-miss.sh,
+#                     hooked from phase-2-vocabularies.md §2.9.6) —
+#                     operates on the LLM-synthesized system_vocabularies,
+#                     same input snapshot as §2.9.5, runs AFTER it.
+#                     Carries `kind: vocab-near-miss` for the §6.4-ter
+#                     keep-both / merge / rename dialog matcher.
+seeded_findings:                             # [walker (mechanical) + llm (review)]
+  - <per seeded-findings.schema.yaml>
+
+# ── LLM-additions zone ─────────────────────────────────────────
+# Free-form notes — anything Phase 2 should hand forward that doesn't
+# fit a structured slot (composition oddities, unusual naming the
+# walker can't threshold-detect, DS-architect-specific context).
+# Empty on initial emit. Phase 6 reads but doesn't classify.
+interpretation: []                           # [llm]
+
+# ── Phase-3 handoff ────────────────────────────────────────────
+# Carry-forward for Phase 3's grammar inference. Pure pointer back
+# into system_vocabularies — Phase 3 cross-checks every vocab value
+# against either token-path segments or variant-only annotations.
+phase_3_inputs:                              # [llm]
+  system_vocabularies_ref: "../phase-2-output.yaml#/system_vocabularies"
+  # Snapshot is also embedded for self-containment:
+  system_vocabularies_snapshot: <copy of system_vocabularies above>

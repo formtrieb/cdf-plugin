@@ -1,0 +1,21 @@
+{
+  "name": "cdf",
+  "version": "1.0.0",
+  "description": "Component Description Format (CDF) skills for Claude Code — scaffold and snapshot CDF Profiles from a design system (Figma + tokens). Bundles cdf-profile-scaffold (production-grade, 7-phase) + cdf-profile-snapshot (5–10 min first-touch).",
+  "author": {
+    "name": "at//design",
+    "url": "https://github.com/formtrieb"
+  },
+  "homepage": "https://github.com/formtrieb/cdf",
+  "repository": "https://github.com/formtrieb/cdf-plugin",
+  "license": "Apache-2.0",
+  "keywords": [
+    "cdf",
+    "component-description-format",
+    "design-system",
+    "design-tokens",
+    "figma",
+    "skill",
+    "profile-scaffold"
+  ]
+}

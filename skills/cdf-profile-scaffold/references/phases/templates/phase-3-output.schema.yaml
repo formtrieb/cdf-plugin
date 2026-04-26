@@ -1,0 +1,112 @@
+# phase-3-output.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of the `phase-3-output.yaml` artefact produced on the
+# **T1/T2 path** by Phase 3 (Grammars). T0 retains the legacy
+# `<ds>.phase-3-notes.md` markdown.
+#
+# Field annotations:
+#   [walker]     — set mechanically: yq/jq transforms over MCP responses
+#                  (list_token_sets, find_placeholders, browse_tokens),
+#                  or read from `.cdf.config.yaml`.
+#   [llm]        — LLM-authored: grammar inference, alias classification,
+#                  intent/emphasis folding analysis.
+#   [phase-6]    — populated downstream during Phase-6 aggregation.
+#
+# Each `seeded_findings[]` entry follows `seeded-findings.schema.yaml`.
+# Phase 6 hard-asserts `schema_version`.
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-phases-2-6.md
+#   - Skill: ../phase-3-grammars.md §1
+#   - Producer: inline yq/jq + LLM synthesis (no dedicated script)
+#   - Consumer: Phase 4 (.phase_4_inputs.grammars_snapshot) and Phase 6.
+
+schema_version: phase-3-output-v1            # [walker] — Phase 6 hard-asserts
+
+generated_at: <ISO 8601 UTC>                 # [walker]
+generated_by:                                # [walker]
+  source_phase_2: <relative path to phase-2-output.yaml>
+  tier: T1
+  token_regime: tokens-studio                # mirrors .cdf.config.yaml
+
+# ── Mechanical: token-layer enumeration ────────────────────────
+# Pulled from the DS-specific tokens MCP via `list_token_sets` /
+# `list_themes` (or equivalent). One entry per top-level token-set
+# group; `sets[]` enumerates the leaf paths inside.
+token_layers:                                # [walker]
+  - name: <string>                           # e.g. "core/colors", "semantic/light"
+    role: source | enabled | reference       # MCP-reported role if available
+    set_count: <int>
+    sample_sets: [<string>, ...]             # first ≤5 set names for evidence
+
+# ── Mechanical: placeholder enumeration ────────────────────────
+# Pulled from the tokens MCP via `find_placeholders` (or grep against
+# DTCG files for the `#f305b7` magenta sentinel + per-DS markers).
+# Grouped by context — typically the immediate parent path.
+# Phase-3 reserves cluster Y for placeholder findings (see schema).
+placeholders_by_context:                     # [walker]
+  <context-path>:
+    count: <int>
+    samples: [<token-path>, ...]             # first ≤5 examples
+
+# ── LLM synthesis: grammars ────────────────────────────────────
+# The headline output: grammar-candidate detection from path-shape
+# patterns (Step 3.2 / 3.3 / 3.4 / 3.7). Slot names match the
+# §2 carry-forward template — LLM fills, walker does not modify.
+grammars:                                    # [llm]
+  - name: <string>                           # e.g. "color.controls"
+    pattern: <string>                        # e.g. "color.controls.{hierarchy}.{element}.{state}"
+    depth: <int>
+    axes:                                    # values per position
+      <axis-name>: [<value>, ...]
+    leaf_count: <int>                        # observed in tree
+    cartesian_count: <int>                   # product of axis cardinalities
+    sparsity: full | partial | sparse        # classification
+    state_subsets:                           # per (axis × axis) coverage
+      - where: { <axis>: <value>, <axis>: <value> }
+        states: [<string>, ...]
+    aliases:                                 # alias classification (Step 3.4)
+      self_ref: <int>
+      cross_grammar: <int>
+      semantic_chain: <int>
+
+# ── LLM synthesis: standalone tokens ───────────────────────────
+# Depth-inconsistent leaves or tokens outside grammar-groups.
+standalone_tokens: [<token-path>, ...]        # [llm]
+
+# ── Mechanical / hybrid: drift candidates ──────────────────────
+# DTCG ↔ Figma count deltas per grammar. Mechanical when the tokens
+# MCP exposes both sides; LLM-derived otherwise. The Step 3.6 Field
+# observation pattern.
+drift_candidates:                            # [walker | llm]
+  - grammar: <string>
+    dtcg_count: <int>
+    figma_count: <int>
+    delta: <int>                             # figma − dtcg (signed)
+    example: <token-path>                    # one drifted token
+
+# ── LLM synthesis: component bindings (Step 3.5) ───────────────
+component_bindings:                          # [llm]
+  <component-name>: [<token-pattern>, ...]
+
+# ── Mechanically + LLM-seeded findings ─────────────────────────
+# Mechanical seeds (deterministic):
+#   §Y-placeholders-<context> (cluster Y) — emitted per
+#                            placeholder context with hits > 0.
+#   §A-token-layer-drift (cluster A)      — when drift_candidates is
+#                            non-empty.
+#
+# LLM-additional seeds (Step 3.7 etc.):
+#   intent/emphasis folding, ghost-hierarchy, cross-grammar aliases as
+#   feature, orphan standalone tokens. All cluster A.
+seeded_findings:                             # [walker (mechanical) + llm]
+  - <per seeded-findings.schema.yaml>
+
+# ── LLM-additions zone ─────────────────────────────────────────
+interpretation: []                           # [llm]
+
+# ── Phase-4 handoff ────────────────────────────────────────────
+# Snapshot of grammars[] for Phase-4 mode-sparsity cross-check.
+phase_4_inputs:                              # [llm]
+  grammars_snapshot: <copy of grammars above>
+  token_layers_snapshot: <copy of token_layers above>

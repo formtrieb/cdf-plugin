@@ -1,0 +1,112 @@
+# findings.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of the `<ds>.findings.yaml` artefact emitted by
+# Phase 6 (Findings + Classify) on the **T1/T2 path**. This is the
+# Lever-2A Scope-A keystone — replaces the prose `<ds>.findings.md`
+# as the source of truth. The .md file is rendered from this YAML
+# via the `cdf_render_findings` MCP tool (deprecated bash twin:
+# `scripts/render-findings.sh`).
+#
+# Three derived views are filtered/rendered from this single source:
+#
+#   <ds>.findings.md           — DS-meeting-ready prose; cluster
+#                                 headings + 4-field per finding.
+#                                 (always emitted)
+#   <ds>.conformance.yaml      — entries where user_decision ==
+#                                 accept-as-divergence.
+#                                 (emitted iff ≥ 1 such finding)
+#   <ds>.housekeeping.md       — cluster == Z entries when count > 10;
+#                                 inlined in findings.md otherwise.
+#                                 (emitted iff threshold met)
+#
+# Field annotations:
+#   [aggregator] — set by Phase 6 on aggregation from
+#                  `phase-*-output.yaml` seeded_findings[].
+#   [user]       — filled by User-decision via AskUserQuestion
+#                  (Rule-E COVERAGE). Every Cluster A–E entry MUST
+#                  have a non-`pending` decision before Phase 7.
+#   [walker]     — preserved verbatim from the source phase output.
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-phases-2-6.md
+#   - Skill: ../phase-6-findings-classify.md §1
+#   - Producer: Phase 6 (jq aggregation + yq emit; AskUserQuestion loop)
+#   - Renderer: cdf_render_findings MCP tool (deprecated bash twin:
+#               scripts/render-findings.sh)
+
+schema_version: findings-v1                  # [aggregator] — Phase 7 / renderer assert
+
+ds_name: <string>                            # [aggregator] from .cdf.config.yaml.scaffold.ds_name
+generated_at: <ISO 8601 UTC>                 # [aggregator]
+generated_by:                                # [aggregator]
+  skill_version: <string>                    # mirrors .cdf.config.yaml scaffold.skill_version
+  source_phase_yamls:                        # which phase outputs were aggregated
+    - phase-1-output.yaml
+    - phase-2-output.yaml
+    - phase-3-output.yaml
+    - phase-4-output.yaml
+    - phase-5-output.yaml
+
+# ── Aggregated findings ────────────────────────────────────────
+# Union of every seeded_findings[] across phases 1–5, prefixed with
+# source phase. Each entry follows seeded-findings.schema.yaml and
+# adds `source_phase` (set by aggregator) + filled `user_decision`.
+findings:                                    # [aggregator + user]
+  - id: "§p<N>-<original-id>"                # [aggregator] phase-prefixed to avoid collisions
+    cluster: <enum>                          # [walker] preserved
+    title: <string>                          # [walker]
+    observation: <string>                    # [walker]
+    threshold_met: <string>                  # [walker] iff mechanically seeded
+    sot_recommendation: <string>             # [walker | llm-review]
+    discrepancy: <string>                    # [walker | llm-review]
+    instances: [<string>, ...]               # [walker]
+    interpretation_note: <string>            # [walker]
+    related: [<id>, ...]                     # [walker | aggregator-rewritten with phase prefix]
+    source_phase: <int 1..5>                 # [aggregator] derived from filename
+    # ── Lever-5 prose-quality fields (preserved from seeded-findings) ──
+    plain_language: <string>                 # [walker] ≤50w, jargon-free; req'd cluster A/B/C/D
+    concrete_example: <string>               # [walker] real values from User's DS
+    default_if_unsure:                       # [walker] safe default + rationale
+      decision: <enum>
+      rationale: <string>
+    user_decision: <enum>                    # [user] one of:
+                                             #   pending              — Phase-7 emits placeholder + warning
+                                             #   adopt-as-is
+                                             #   adopt-DTCG
+                                             #   adopt-Figma
+                                             #   adopt-Components
+                                             #   accept-as-divergence — entry in conformance.yaml; ships
+                                             #   defer                — advisory; ships; in deferred_findings[]
+                                             #   drop
+                                             #   block                — STOPS RELEASE; in ship_blockers[]
+
+# ── Summary block (computed by aggregator) ─────────────────────
+# Counts derived from findings[]. Recompute on every emit; never
+# hand-edit. The renderer / Phase-7 use this for ship-blocker
+# detection and the findings.md preamble stats.
+summary:                                     # [aggregator]
+  total_findings: <int>
+  by_cluster:                                # cluster-letter → count
+    A: <int>
+    B: <int>
+    C: <int>
+    D: <int>
+    E: <int>
+    Y: <int>
+    Z: <int>
+  by_decision:                               # decision-value → count
+    pending: <int>
+    adopt-as-is: <int>
+    adopt-DTCG: <int>
+    adopt-Figma: <int>
+    adopt-Components: <int>
+    accept-as-divergence: <int>
+    defer: <int>
+    drop: <int>
+    block: <int>
+  ship_blockers: [<id>, ...]                 # findings where decision == block
+                                             # Phase 7 surfaces these in handback summary;
+                                             # Profile is marked NOT ship-ready when non-empty.
+  deferred_findings: [<id>, ...]             # findings where decision == defer
+                                             # Advisory only — Profile ships normally.
+                                             # Surfaced in findings.md "Deferred" section.

@@ -1,0 +1,135 @@
+# seeded-findings.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of a single entry in `seeded_findings[]`. Every
+# `phase-N-output.yaml` (T1/T2 path, Phases 1–5) embeds an array of this
+# shape. Phase 6 iterates over the union (`yq ea '.seeded_findings[]'
+# phase-*-output.yaml`) and writes each User-decision back into a
+# canonical `<ds>.findings.yaml`.
+#
+# This file is the contract between phase producers and the Phase-6
+# consumer. Field annotations are:
+#   [walker]   — set by a mechanical seeder (extract.sh, inline jq, MCP
+#                output transform). LLM MUST NOT modify these.
+#   [llm]      — LLM-authored (sot_recommendation, interpretation_note,
+#                discrepancy). Empty on initial mechanical emit.
+#   [phase-6]  — populated during Phase 6 (user_decision, source_phase
+#                prefix on aggregation).
+#
+# Cluster vocabulary mirrors SKILL.md §4:
+#   A — Token-Layer Architecture (grammar, aliases, drift)
+#   B — Theming & Coverage (mode-sparsity, brand-drift, orphan axes)
+#   C — Component-Axis Consistency (vocab divergence, compound states)
+#   D — Accessibility Patterns (focus strategy, utility components)
+#   E — Documentation Surfaces (doc-frame ingestion, external docs)
+#   F — CDF-Format Gaps (separate artefact — not consumed by Phase 6)
+#   Y — Placeholder-family (Phase-3 mechanical seed via find_placeholders)
+#   Z — Housekeeping (typos, casing, abandoned-work residue, etc.)
+#
+# Decision vocabulary (user_decision) mirrors Rule E §2:
+#   pending              — Phase-6 hasn't asked yet (initial state).
+#   adopt-as-is          — take SoT recommendation, bake into Profile.
+#   adopt-DTCG           — take DTCG side of a discrepancy.
+#   adopt-Figma          — take Figma side of a discrepancy.
+#   adopt-Components     — take component-spec side of a discrepancy.
+#   accept-as-divergence — known DS choice; emit conformance.yaml entry,
+#                          Profile ships normally.
+#   defer                — User wants to revisit later, no rush; Profile
+#                          ships normally; tracked in summary.deferred_findings[].
+#                          USE THIS instead of `block` when the issue is
+#                          "I'm unsure" rather than "ship-blocker."
+#   drop                 — finding is wrong / noise; remove from emit.
+#   block                — Profile MUST NOT ship until resolved; tracked in
+#                          summary.ship_blockers[]. Use sparingly — only
+#                          when the finding genuinely blocks release.
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-phases-2-6.md
+#   - Skill master: ../../../SKILL.md §4
+#   - Phase-1 example: phase-1-output.schema.yaml §seeded_findings
+
+# ── Required fields ─────────────────────────────────────────────
+id: "§<cluster-letter><N>"          # [walker] unique within a single phase
+                                    # output. Phase 6 prefixes with the
+                                    # source phase (e.g. "§p2-B1") on
+                                    # aggregation to avoid collisions.
+cluster: <enum>                     # [walker] one of A | B | C | D | E | Y | Z
+                                    # (F is out-of-scope — see SKILL.md §4)
+title: <string>                     # [walker] short human-readable label
+observation: <string>               # [walker] data-cite, NOT inference.
+                                    # Quote counts / names / paths verbatim.
+user_decision: pending              # [phase-6] enum above. Always emitted
+                                    # as `pending` by upstream phases;
+                                    # Phase 6 fills via AskUserQuestion.
+
+# ── Prose-quality fields (Lever 5 — REQUIRED for cluster A/B/C/D) ─
+plain_language: <string>            # [llm] ≤50 words, jargon-free. What
+                                    # would the User see in their DS today?
+                                    # Avoid CDF-spec terminology except
+                                    # where it maps 1:1 to a User concept.
+                                    # REQUIRED for cluster A/B/C/D.
+                                    # Optional for cluster E/Y/Z (their
+                                    # `observation` is usually plain enough).
+                                    #
+                                    # Lever 5.I — NO spec citations or bare
+                                    # CDF format-terms inside this field:
+                                    # forbidden tokens include `§<n>.<n>`
+                                    # references, `Profile`, `vocabulary
+                                    # isolation`, `axis-value collision`,
+                                    # `system-vocabulary`, `token-grammar`,
+                                    # `interaction pattern` (as a CDF
+                                    # concept). For meta findings, restate
+                                    # the user-visible symptom in concrete
+                                    # DS terms; reserve format-mechanism
+                                    # description for `observation` /
+                                    # `sot_recommendation`. (Rule landed
+                                    # 2026-04-25 after three real-run
+                                    # cluster-C entries leaked spec refs.)
+concrete_example: <string>          # [llm | walker] real values from the
+                                    # User's own DS data (verbatim citation
+                                    # of ds_inventory.* or token-MCP
+                                    # output). NOT a hypothetical. RECOMMENDED
+                                    # for cluster A/B/C.
+default_if_unsure:                  # [llm] safe default if User can't decide.
+  decision: <enum>                  #   one of the user_decision values above.
+  rationale: <string>               #   one-sentence why this is safe.
+                                    # REQUIRED for cluster A/B/C/D — reduces
+                                    # "block out of uncertainty"; gives the
+                                    # User an explicit safe path that the
+                                    # AskUserQuestion pre-selects as default.
+
+# ── Optional fields ─────────────────────────────────────────────
+threshold_met: <string>             # [walker] for mechanically-seeded
+                                    # findings: the trigger condition
+                                    # (e.g. "with_description/total < 0.1").
+                                    # Omit for LLM-seeded entries.
+sot_recommendation: <string>        # [llm] LLM-authored Source-of-Truth
+                                    # recommendation. May be added by the
+                                    # phase that seeds, or deferred to
+                                    # Phase 6's reading pass.
+discrepancy: <string>               # [llm] explanation of why two sides
+                                    # disagree (DTCG says X, Figma says Y).
+                                    # Omit when there is no two-sided
+                                    # discrepancy (pure housekeeping).
+instances: [<string>, ...]          # [walker] matching items — names,
+                                    # paths, ids. Use for Z-cluster lists
+                                    # (frame-named, casing-drift, etc.).
+interpretation_note: <string>       # [llm] free-form context the seeder
+                                    # could not capture mechanically.
+related: ["§X", "§Y"]               # [walker | llm] cross-references when
+                                    # findings interact (e.g. §A1 placeholder
+                                    # is symptom of §B1 mode-sparsity).
+                                    # Phase 6 may rewrite to phase-prefixed
+                                    # ids on aggregation.
+source_phase: <int 1..5>            # [phase-6] populated on aggregation.
+                                    # Upstream phases MUST NOT set this —
+                                    # Phase 6 derives it from filename.
+kind: <string>                      # [walker] optional discriminator used by
+                                    # Phase-6 to pick the right AskUserQuestion
+                                    # template. Currently recognised values:
+                                    #   vocab-near-miss — render §6.4-ter
+                                    #     keep-both / merge / rename menu
+                                    #     (cluster C). Cluster Z near-miss
+                                    #     uses the standard menu.
+                                    # Other walker seeds MAY omit this field
+                                    # — Phase-6 falls back to the standard
+                                    # menu when `kind` is absent.

@@ -1,0 +1,317 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# shadcn/ui — CDF Profile (foreign-DS validation pass, token-bridge focus)
+# CDF Profile Format v1.0.0-draft.6
+#
+# Scope: Button + Badge only. Minimal legal Profile that lets those two
+# components validate while stressing the token-bridge seam — the
+# concepts (background, primary, destructive, …) are declared here but
+# the VALUES live in the consumer's globals.css and are consumer-owned.
+# See ../docs/BIG-DS-SHADCN-BRIEF.md and findings.md F-shadcn-0.
+#
+# Token strategy (γ) — Hybrid semantic-shape:
+#   - `token_grammar: {}` — shadcn has no dotted grammar; names are flat
+#     CSS vars (`--primary`, `--primary-foreground`, …).
+#   - `standalone_tokens:` declares each semantic concept. Every
+#     description begins with "external —" to signal consumer ownership
+#     per §6.11. No new format field (keeps Radix-level 0/0 budget).
+#   - Pair pattern (`--primary` + `--primary-foreground`) lives in prose
+#     per-token; F-shadcn-1 candidate if Button+Badge expose the loss
+#     structurally.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Identity ─────────────────────────────────────────────────────────────────
+
+name: ShadcnUI
+version: "0.1.0-draft"
+cdf_version: ">=1.0.0-draft <2.0.0"
+dtcg_version: "2025.10"
+description: >
+  shadcn/ui components distilled to CDF. The DS is Radix Primitives +
+  Tailwind utilities + CSS variables. Consumers copy globals.css into
+  their project and fork it; this Profile models the SHAPE of that
+  token space without owning its VALUES. Covers only Button and Badge —
+  just enough to stress the token-bridge.
+
+# ── Vocabularies ─────────────────────────────────────────────────────────────
+# Single combined `variant` vocabulary. shadcn's variant values (default,
+# destructive, outline, …) must be disjoint across all vocabularies per
+# Profile §5.5 rule 5; two scoped vocabs (`button_variant`, `badge_variant`)
+# would collide on `default`, `destructive`, `outline`. A combined vocab
+# is de-facto mandated. Badge restricts to a subset at the property level.
+#
+# `size` is Button-only; Badge has no size axis.
+
+vocabularies:
+
+  variant:
+    description: >
+      shadcn's visual/behavioural role flavor. Button uses all six;
+      Badge uses the first four (default, secondary, destructive,
+      outline). Values map 1:1 to token pairs in `standalone_tokens`
+      below (e.g. `destructive` → `color.destructive` +
+      `color.destructiveForeground`).
+    values: [default, destructive, outline, secondary, ghost, link]
+
+  size:
+    description: >
+      Button's scale axis. `default` is the baseline; `sm` and `lg`
+      are compact/expanded; `icon` is a square icon-only button.
+      Not used by Badge. Maps to Tailwind utility bundles in the
+      consumer's code, not to a token.
+    values: [default, sm, lg, icon]
+
+# ── Token Grammar ────────────────────────────────────────────────────────────
+# Empty. shadcn ships flat CSS custom properties, not a dotted grammar.
+# The draft.6 §6.1 blessing ("A Profile with no visual contract MAY
+# declare `token_grammar: {}`") covers this — we use `standalone_tokens`
+# for every concept instead. Downstream component `tokens:` blocks
+# reference the standalone paths.
+
+token_grammar: {}
+
+token_layers: []
+
+# ── Standalone Tokens — the token-bridge ─────────────────────────────────────
+# This is the (γ) strategy in action. Every entry declares:
+#   - dtcg_type — for type-checking when a Component binds it
+#   - description — beginning with "external —" to signal the value is
+#     consumer-owned and lives in globals.css, not in this repo
+#
+# Casing follows Profile `naming.casing.token_paths: camelCase`. The
+# runtime CSS var names are kebab-case (`--primary-foreground`); the
+# translation camelCase → kebab-case is a Target-layer concern, not ours.
+#
+# Pair pattern: shadcn groups a background with a paired foreground
+# (`primary` + `primaryForeground`). The pairing is documented in
+# descriptions; `standalone_tokens` has no first-class pair concept.
+# Watch F-shadcn-1 — does this feel like a real loss or cosmetic?
+
+standalone_tokens:
+
+  # ── Surface pair: page-level ────────────────────────────────────────────
+  color.background:
+    dtcg_type: color
+    description: >
+      external — page background. Paired with `color.foreground` for
+      default text on the page surface. Light: near-white. Dark:
+      near-black. Consumer-owned in globals.css `:root` / `.dark`.
+  color.foreground:
+    dtcg_type: color
+    description: >
+      external — default page text. Paired with `color.background`.
+      WCAG-sufficient contrast against background is the consumer's
+      responsibility. Lives in globals.css.
+
+  # ── Surface pair: card ─────────────────────────────────────────────────
+  color.card:
+    dtcg_type: color
+    description: >
+      external — card surface fill. Paired with `color.cardForeground`.
+      Consumer-owned; see globals.css.
+  color.cardForeground:
+    dtcg_type: color
+    description: >
+      external — text on card surface. Paired with `color.card`.
+
+  # ── Surface pair: popover ──────────────────────────────────────────────
+  color.popover:
+    dtcg_type: color
+    description: >
+      external — popover/dropdown surface fill. Paired with
+      `color.popoverForeground`. Consumer-owned.
+  color.popoverForeground:
+    dtcg_type: color
+    description: >
+      external — text on popover surface. Paired with `color.popover`.
+
+  # ── Role pair: primary (Button default variant binds here) ─────────────
+  color.primary:
+    dtcg_type: color
+    description: >
+      external — primary action colour (Button.variant=default
+      background, Badge.variant=default background). Paired with
+      `color.primaryForeground` for readable label contrast.
+      Consumer-owned.
+  color.primaryForeground:
+    dtcg_type: color
+    description: >
+      external — label/text colour on a primary surface. Paired with
+      `color.primary`.
+
+  # ── Role pair: secondary ───────────────────────────────────────────────
+  color.secondary:
+    dtcg_type: color
+    description: >
+      external — secondary action/emphasis fill (Button.variant=secondary,
+      Badge.variant=secondary). Paired with `color.secondaryForeground`.
+      Consumer-owned.
+  color.secondaryForeground:
+    dtcg_type: color
+    description: >
+      external — label colour on a secondary surface.
+
+  # ── Role pair: destructive ─────────────────────────────────────────────
+  color.destructive:
+    dtcg_type: color
+    description: >
+      external — destructive action colour (Button.variant=destructive,
+      Badge.variant=destructive). Paired with `color.destructiveForeground`.
+      In the newer shadcn v4, Button destructive uses a literal `white`
+      for its label rather than this paired foreground; Badge still
+      uses the pair. F-shadcn candidate if that inconsistency surfaces
+      during spec authoring.
+  color.destructiveForeground:
+    dtcg_type: color
+    description: >
+      external — label colour on destructive surface. Legacy/Badge-only
+      usage in shadcn v4; Button destructive now prefers white.
+
+  # ── Role pair: muted ───────────────────────────────────────────────────
+  color.muted:
+    dtcg_type: color
+    description: >
+      external — muted/subtle surface fill (not used by Button/Badge
+      directly, but referenced by variant=outline's hover state via
+      `accent`). Paired with `color.mutedForeground`.
+  color.mutedForeground:
+    dtcg_type: color
+    description: >
+      external — label on muted surface. Used by Button.variant=ghost
+      / link for de-emphasised text.
+
+  # ── Role pair: accent (hover states, outline hover) ────────────────────
+  color.accent:
+    dtcg_type: color
+    description: >
+      external — accent/hover surface fill. Button.variant=outline and
+      variant=ghost use `accent` as their hover-state background.
+      Paired with `color.accentForeground`.
+  color.accentForeground:
+    dtcg_type: color
+    description: >
+      external — label on accent surface. Used by outline/ghost on
+      hover.
+
+  # ── Singletons: structural colours ─────────────────────────────────────
+  color.border:
+    dtcg_type: color
+    description: >
+      external — default border colour. Used by Button.variant=outline
+      and Badge.variant=outline for the 1px stroke. Consumer-owned.
+  color.input:
+    dtcg_type: color
+    description: >
+      external — form input border/background (not used by Button or
+      Badge). Included for completeness of the shadcn token surface.
+  color.ring:
+    dtcg_type: color
+    description: >
+      external — focus ring colour. Button applies this via
+      `focus-visible:ring-ring/50`. Consumer-owned.
+
+  # ── Singletons: geometry ───────────────────────────────────────────────
+  radius.default:
+    dtcg_type: dimension
+    description: >
+      external — base border radius. Consumer sets `--radius` (typically
+      0.5rem). Button's `rounded-md` and Badge's `rounded-md` derive
+      from this; Tailwind config reads `--radius` via theme extension.
+
+# ── Theming ──────────────────────────────────────────────────────────────────
+# shadcn ships a Light/Dark mechanism by toggling a `.dark` class on the
+# root element. The Profile declares the axis as part of the semantic
+# surface, but `set_mapping: {}` because the token SETS (which values
+# correspond to Light vs Dark) are managed entirely in the consumer's
+# globals.css — the DS defines only the default palette shape.
+#
+# This is the "token_provider is elsewhere" tension made concrete: the
+# axis exists at the Profile level, the values per mode live outside.
+
+theming:
+  modifiers:
+    semantic:
+      description: >
+        Light/Dark appearance. Activated at runtime by adding or
+        removing the `.dark` class on the document root element. Each
+        mode has a distinct resolution of every `color.*` standalone
+        token; both resolutions live in globals.css `:root` and `.dark`
+        blocks. The DS owns neither set of values.
+      values: [Light, Dark]
+  set_mapping: {}
+
+# ── Naming ───────────────────────────────────────────────────────────────────
+# `sh` is a short, lowercase, distinct identifier (disjoint from `ft`,
+# `mp`, `rdx`). Casing stays at CDF defaults — shadcn doesn't dictate
+# source-code naming conventions (it DOES dictate runtime CSS-var naming,
+# but that's a Target concern). `reserved_names: {}` per convention.
+
+naming:
+  identifier: sh
+  casing:
+    component_names: PascalCase
+    properties: camelCase
+    token_paths: camelCase
+  reserved_names: {}
+
+# ── Interaction Patterns ─────────────────────────────────────────────────────
+# Two patterns reused from the Radix profile:
+#
+#   `static`    — Badge: non-interactive, one state.
+#   `pressable` — Button: pointer + keyboard activation (four states).
+#
+# No `toggleable` or `selectable` needed — Button and Badge together do
+# not mirror any state, so those axes aren't declared here.
+
+interaction_patterns:
+
+  static:
+    description: >
+      Non-interactive — one state forever. Badge lives here; it is
+      purely decorative even though it has six variants.
+    states: [enabled]
+
+  pressable:
+    description: >
+      Click/tap activation via the native `<button>` (Button) or
+      polymorphic `asChild` override. Four states covering the full
+      shadcn interaction surface including the focus-visible ring.
+    states: [enabled, hover, pressed, disabled]
+    promoted: [disabled]
+
+# ── Accessibility Defaults ───────────────────────────────────────────────────
+# Category baselines only. Per-component keyboard / aria are declared in
+# each Component spec. Primitive → `<span>` (Badge); Interactive →
+# `<button>` (Button). Radix's headless a11y wiring is inherited at the
+# component level when relevant.
+
+accessibility_defaults:
+
+  category_defaults:
+    Primitive:
+      focus_visible: false
+      element: span
+    Interactive:
+      focus_visible: true
+      element: button
+      keyboard: pressable
+
+# ── Categories ───────────────────────────────────────────────────────────────
+# Primitive (Badge) and Interactive (Button). No `token_grammar:` key on
+# either — grammar is empty; components bind to standalone_tokens
+# directly in their `tokens:` blocks.
+
+categories:
+
+  Primitive:
+    description: >
+      Non-interactive decorative or labelling elements. shadcn Badge
+      lives here. Renders one state; variant-driven colour only.
+    interaction: static
+    examples: [Badge]
+
+  Interactive:
+    description: >
+      User-input components. shadcn Button lives here. Variant + size
+      cross-product with full pressable state coverage.
+    interaction: pressable
+    examples: [Button]

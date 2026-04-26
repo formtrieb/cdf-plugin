@@ -1,0 +1,100 @@
+# phase-4-output.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of the `phase-4-output.yaml` artefact produced on the
+# **T1/T2 path** by Phase 4 (Theming). T0 retains the legacy
+# `<ds>.phase-4-notes.md` markdown.
+#
+# Field annotations:
+#   [walker]   — set mechanically: yq/jq transforms over MCP responses
+#                (`list_themes`, `compare_themes`,
+#                `browse_tokens(set=...)`). LLM MUST NOT modify.
+#   [llm]      — LLM-authored: classification, sparsity rationale,
+#                component-layer-gap interpretation.
+#
+# Each `seeded_findings[]` entry follows `seeded-findings.schema.yaml`.
+# Phase 6 hard-asserts `schema_version`.
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-phases-2-6.md
+#   - Skill: ../phase-4-theming.md §1
+#   - Producer: inline yq/jq + LLM synthesis (no dedicated script)
+#   - Consumer: Phase 5 (.phase_5_inputs.theming_axes_snapshot) and Phase 6.
+
+schema_version: phase-4-output-v1            # [walker] — Phase 6 hard-asserts
+
+generated_at: <ISO 8601 UTC>                 # [walker]
+generated_by:                                # [walker]
+  source_phase_3: <relative path to phase-3-output.yaml>
+  tier: T1
+
+# ── Mechanical: theming-axes carry-forward ─────────────────────
+# Pulled from phase-1-output.yaml.theming_matrix.collections (the
+# resolver-filled slot) + Phase-3 grammars cross-check. Each axis
+# carries the modes (Light/Dark/etc.) and is enriched per Step 4.1.
+theming_axes:                                # [walker (modes) + llm (description, affects)]
+  - name: <string>                           # e.g. "semantic", "device", "shape"
+    contexts: [<string>, ...]                # modes from list_themes
+    required: <bool>                         # [llm]
+    data_attribute: <string>                 # [llm] e.g. "data-semantic"
+    description: <string>                    # [llm]
+    affects: [<grammar-name>, ...]           # [llm] which Phase-3 grammars depend on this axis
+
+# ── Mechanical: mode-sparsity matrix (Step 4.3) ────────────────
+# Per collection, leaf count per mode. Mechanical when the tokens
+# MCP supports per-set enumeration; LLM-derived otherwise. Used by
+# §4.5 brand-drift detection.
+mode_sparsity:                               # [walker via compare_themes / browse_tokens]
+  - collection: <string>                     # e.g. "color.semantic"
+    modes: [<string>, ...]
+    leaf_counts:                             # mode → count
+      <mode>: <int>
+    delta_pattern: <string>                  # [llm] human-readable summary
+
+# ── Mechanical: orphan-modes (Step 4.3 derivative) ─────────────
+# Modes whose leaf-count is materially lower than siblings —
+# threshold-emit when (max − this) > 0 AND this < max.
+orphan_modes:                                # [walker]
+  - axis: <string>
+    mode: <string>
+    expected_count: <int>                    # max across siblings
+    actual_count: <int>
+    delta: <int>                             # expected − actual
+    sample_missing_paths: [<string>, ...]    # first ≤5 paths missing in this mode
+
+# ── LLM: component-layer gaps (Step 4.4 — tablet-orphan etc.) ──
+# Cross-check between theming_axes contexts and Phase-1 variant-axes
+# values. This is Rule-E advisor territory — needs User dialog.
+component_layer_gaps:                        # [llm]
+  - axis: <string>
+    token_modes: [<string>, ...]
+    component_values: [<string>, ...]
+    orphan: <string>                         # the value present in tokens but absent in variants
+    classification_hint: <string>            # "css-only" | "migration-in-flight" | "genuinely-orphaned"
+
+# ── LLM: set_mapping (always-on vs modifier-bound) ─────────────
+# How each Tokens-Studio set / Figma collection-mode is consumed at
+# resolve-time. Step 4.7 distinction.
+set_mapping:                                 # [llm]
+  <set-or-collection-name>:
+    always_enabled: <bool>                   # OR
+    modifier: <theming-axis-name>
+    context: <mode-name>
+
+# ── Mechanical + LLM seeded findings ───────────────────────────
+# Mechanical seeds (deterministic):
+#   §B-mode-sparsity-<collection> (cluster B) — emitted per collection
+#                            in mode_sparsity with non-zero delta.
+#   §B-orphan-mode-<axis>-<mode> (cluster B) — per orphan_modes entry.
+#
+# LLM-additional seeds (Steps 4.4 / 4.5 / 4.6 / 4.7):
+#   tablet-orphan, brand-drift narrative, typography/shadow rep-gap,
+#   always-on ambiguity. All cluster B (Theming & Coverage).
+seeded_findings:                             # [walker (mechanical) + llm]
+  - <per seeded-findings.schema.yaml>
+
+# ── LLM-additions zone ─────────────────────────────────────────
+interpretation: []                           # [llm]
+
+# ── Phase-5 handoff ────────────────────────────────────────────
+phase_5_inputs:                              # [llm]
+  theming_axes_snapshot: <copy of theming_axes above>

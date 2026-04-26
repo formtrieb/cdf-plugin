@@ -1,0 +1,245 @@
+# snapshot.profile.schema.yaml  (contract / reference — NOT runtime-validated)
+#
+# Canonical shape of the `<ds>.snapshot.profile.yaml` artefact emitted by
+# the `cdf-profile-snapshot` skill. This file is read by skill maintainers
+# and copied as a starting template by the synthesis pass.
+#
+# **Validator contract:** unlike `<ds>.profile.yaml` (Production-Scaffold
+# output, validated by `cdf_validate_profile` L0–L7), the snapshot is
+# explicitly NOT validator-grounded. There is no `cdf_validate_snapshot`.
+# The snapshot's trust handshake lives in `blind_spots:` + `_quality:
+# draft` markers — NOT in a schema-checker.
+#
+# **Schema authority:** field names are a SUBSET of the CDF Profile spec
+# (cdf/specs/profile/*.md). Where a field appears here it carries the
+# Profile-spec semantics. Snapshot adds NO Profile-foreign fields —
+# adoption-evaluators reading both Snapshot and Production output should
+# see the same shape, just trimmed.
+#
+# Field annotations:
+#   [walker]      — from Phase-1 mechanical extract output
+#                   (.cdf-cache/phase-1-output.yaml). HIGH trust.
+#   [config]      — from .cdf.config.yaml (DS name, identifier, regime).
+#                   HIGH trust.
+#   [llm-draft]   — LLM single-pass synthesis. Carries _quality: draft.
+#                   MEDIUM-LOW trust. MUST cite walker output for any
+#                   quantitative claim (synthesis.md citation contract).
+#   [template]    — literal shape. Kept verbatim in the emit.
+#
+# Trust gradient (top → bottom of file):
+#   metadata     [walker + config]            HIGH
+#   inventory    [walker]                     HIGH
+#   blind_spots  [template + llm-targeted]    HIGH (honesty mechanism)
+#   upgrade_path [template]                   HIGH
+#   ────── soft boundary; everything below is _quality: draft ──────
+#   vocabularies      [llm-draft]             MEDIUM-LOW
+#   token_grammar     [llm-draft]             MEDIUM
+#   theming           [llm-draft]             MEDIUM-LOW
+#   interaction_a11y  [llm-draft]             LOW
+#   findings_unclassified [llm-draft]         LOW (max 15, flag-only)
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-25-quick-look-mode.md (QL.A)
+#   - Skill: ../SKILL.md
+#   - Synthesis doc (TODO QL.C): references/synthesis.md
+#   - Renderer: cdf_render_snapshot MCP tool (scripts/render-snapshot.sh deprecated)
+#   - Spec authority: cdf/specs/profile/*.md (loaded via cdf_get_spec_fragment)
+
+snapshot_version: snapshot-profile-v1            # [template] — bump on shape change
+
+# ═══════════════════════════════════════════════════════════════════
+# REQUIRED — high trust, mechanically derivable, validator-grade input
+# ═══════════════════════════════════════════════════════════════════
+
+metadata:                                        # REQUIRED
+  ds_name: <string>                              # [config] e.g. "primer", "formtrieb"
+  source:                                        # [config + walker]
+    figma_file_url: <url | null>                 # [config] — null for code-only DS (future)
+    figma_file_name: <string | null>             # [walker] from library.file.json `.name`
+    tier: <T0 | T1 | T2>                         # [config] tier-detection result
+    token_regime: <string>                       # [config] tokens-studio | dtcg-folder | figma-variables | figma-styles | enterprise-rest | none
+    parent_profile: <path | null>                # [config] extends-target (Snapshot RECORDS this; does NOT honour merge semantics — see source-discovery.md §4)
+  identifier: <string>                           # [config] 2–4 letter short code (e.g. "ft", "pr")
+  generated_at: <ISO 8601 UTC>                   # [template] timestamp at emit
+  generated_by:                                  # [template]
+    skill: cdf-profile-snapshot
+    skill_version: "0.1.0-spike"                 # bump on skill-shape change
+    walker_version: phase-1-output-v1            # [walker] schema_version of upstream input
+  cdf_version_compat: ">=1.0.0 <2.0.0"           # [template] Profile-spec range this snapshot models
+                                                 #            against. Informational — NOT a constraint
+                                                 #            on the consuming Profile.
+
+inventory:                                       # REQUIRED — verbatim subset of phase-1-output ds_inventory
+  pages:                                         # [walker]
+    total: <int>
+    content: <int>                               # pages whose childCount > 0
+  component_sets:                                # [walker]
+    tree_unique_count: <int>                     # unique COMPONENT_SETs in the file
+    indexed_count: <int>                         # walker's indexed metadata count
+    remote_only_count: <int>                     # indexed − tree (library refs not in tree)
+  standalone_components:                         # [walker] — pre-classified, author-confirmation deferred to upgrade-path
+    utility: <int>
+    documentation: <int>
+    widget: <int>
+    asset: <int>
+  documentation_surfaces:                        # [walker]
+    figma_component_descriptions:
+      with_description: <int>
+      without_description: <int>
+      ratio: <float 0..1>                        # with / total — 0.0 if no component_sets
+    doc_frames_detected: <int>                   # name-pattern matches (`_doc-content` etc.)
+  tokens:                                        # [llm + token-MCP — single browse_tokens call max]
+    enumeration_method: <browse_tokens | walker_only | none>  # how tokens were counted
+    total_tokens: <int | null>                   # null if enumeration_method == none
+    note: <string | null>                        # one-line freeform; e.g. "1 browse_tokens call, depth=2"
+
+blind_spots:                                     # REQUIRED — the trust handshake
+  # ⚠ MUST be specific to what was actually scanned. NOT boilerplate copy-paste.
+  # ⚠ Each entry names a concrete capability the Snapshot did NOT verify, not
+  #   a generic disclaimer. Bad: "this is just a snapshot." Good: "Vocab-
+  #   collisions across the 23 detected component_sets not analyzed —
+  #   Production Scaffold §5.5 isolation pass would surface these."
+  # ⚠ List length scales with what's actually missing. A DS with 200
+  #   components has more blind-spots than a DS with 12. Don't pad to a
+  #   target count.
+  #
+  # Two entry shapes supported (synthesis.md Contract 3-bis):
+  #   (a) Plain string — for non-resolver-gap blind_spots (e.g. "Findings
+  #       classification status — N findings unclassified").
+  #   (b) Object with `claim:` + `tool_survey:` — REQUIRED for any blind_spot
+  #       whose claim asserts a resolver-gap ("X NOT enumerable / NOT visible
+  #       / NOT accessible"). The tool_survey sub-field documents the probe
+  #       executed before the gap was declared (Rule-A enforcement).
+  #
+  # Plain-string topics if applicable:
+  #   • Findings classification status (always blind here)
+  #   • Vocab-collision analysis (always blind here)
+  #   • Validator status (Snapshot is NOT validator-grounded)
+  #   • Standalone-classification author-confirmation status
+  #   • Interaction-pattern cross-checking against state axes
+  #   • Doc-frame coverage gap quantified vs ingested (Rule G surface)
+  # Object-shape topics (require tool_survey):
+  #   • Token gap audit (placeholders, magenta values)
+  #   • Theming-axis cross-validation (mode-names vs usage)
+  #   • Color/dimension/typography token visibility
+  #   • Variable-mode enumeration
+  - <string>                                     # plain-string form (non-resolver-gap)
+  - claim: <string>                              # object form — resolver-gap claim
+    tool_survey:
+      probed: <string>                           # MCP tool + args invoked, e.g. "mcp__figma__get_variable_defs(fileKey, nodeId=28860:52225)"
+      result: <string>                           # one-line outcome — refuted gap | confirmed gap | partial
+      tools_not_probed: [<string>, ...]          # other loaded MCPs that could fill the gap (transparency)
+
+upgrade_path: |                                  # REQUIRED — one paragraph
+  # [template] — copy the canonical text below verbatim. Skill MAY append
+  # a one-sentence note IF something specific to this DS makes the upgrade
+  # path nontrivial (e.g. "T0 path; expect ~45 min" for a non-cached file).
+  Run cdf-profile-scaffold for the rigorous 7-phase scaffold. It can use
+  this snapshot as a Phase-1 seed (~5 min savings vs from-scratch). The
+  Production Scaffold classifies findings (block/defer/adopt), validates
+  the emitted Profile against cdf_validate_profile L0–L7, and produces a
+  Profile generators can consume.
+
+# ═══════════════════════════════════════════════════════════════════
+# BEST-EFFORT — _quality: draft. NOT a substitute for Production Scaffold.
+# ═══════════════════════════════════════════════════════════════════
+
+# Each section below carries `_quality: draft` at its top level. Consumers
+# (humans + downstream tools) MUST treat these as sketch-grade. The
+# Production-Scaffold output is the validated source of truth; Snapshot
+# best-effort sections are seed-input for that pipeline, not its replacement.
+
+vocabularies:                                    # OPTIONAL — Profile §5 subset
+  _quality: draft                                # [template] required marker
+  # [llm-draft] one entry per detected vocabulary (hierarchy, intent, size, …)
+  # Synthesis source: variantOptions across component_sets[].propertyDefinitions
+  # Citation contract: every value MUST trace to a component_sets entry.
+  <vocab_name>:
+    description: <string>                        # one-paragraph "what this vocabulary means"
+    values: [<string>, ...]                      # ordered, canonical
+    evidence_path: <string>                      # e.g. "ds_inventory.component_sets.entries[3].propertyDefinitions.Hierarchy.variantOptions"
+    # Snapshot OMITS Profile §5 fields:
+    #   - aliases (requires multi-pass detection)
+    #   - per_category (requires variant-shape analysis)
+    #   - notes (requires per-value rationale work)
+
+token_grammar:                                   # OPTIONAL — Profile §6 subset
+  _quality: draft
+  # [llm-draft] one entry per detected grammar (e.g. color.controls,
+  # color.system-status). Synthesis source: 1× browse_tokens call against
+  # the DS-specific tokens MCP, prose-paste into snapshot.
+  # Citation contract: pattern + dtcg_type MUST trace to actual token paths.
+  <grammar_name>:
+    pattern: <string>                            # e.g. "color.controls.{hierarchy}.{element}.{state}"
+    dtcg_type: <string>                          # color | dimension | typography | ... — REQUIRED per Profile §6
+    description: <string>
+    axes: <object>                               # compact — { axis_name: { vocabulary: <ref> | values: [...] } }
+    evidence_path: <string>                      # token-MCP browse path or DTCG file ref
+    # Snapshot OMITS Profile §6 fields:
+    #   - contrast_guarantee (audit-grade work)
+    #   - per-axis notes (per-value rationale)
+    #   - token_layers (cascading layer analysis — Production-only)
+
+theming:                                         # OPTIONAL — Profile §8 subset, modifiers only
+  _quality: draft
+  # [llm-draft] modifier list inferred from Figma Variables collection mode-names
+  # OR from token-MCP list_themes output.
+  # Citation contract: every modifier traces to a real mode-set in the resolver output.
+  # Snapshot does NOT emit set_mapping (only meaningful when emitting a
+  # validator-checkable Profile against actual token-set files).
+  modifiers:
+    <modifier_name>:
+      description: <string>
+      contexts: [<string>, ...]                  # e.g. [Light, Dark]
+      default: <string | null>                   # null if not derivable from source
+      evidence_path: <string>                    # e.g. "Figma Variables collection 'Semantic'"
+
+interaction_a11y:                                # OPTIONAL — Profile §10 subset + a11y notes
+  _quality: draft
+  # [llm-draft] interaction-pattern sketches inferred from Figma component
+  # reactions / variant property names like `State`, `Interaction`,
+  # `Focus`. THIS IS THE LOWEST-TRUST SECTION — flag explicitly in
+  # blind_spots that interaction-patterns are sketched from variant-axis
+  # naming, not validated against component states.
+  patterns:
+    <pattern_name>:
+      description: <string>
+      states: [<string>, ...]                    # e.g. [enabled, hover, focused, disabled]
+      evidence_path: <string>                    # variant-property names + counts
+      # OMITS Profile §10: token_layer, token_mapping, orthogonal_to,
+      # promoted, notes (all require Production-grade synthesis).
+  accessibility_notes: |
+    # [llm-draft] free-form prose — focus-strategy, contrast posture, reduced-motion.
+    # Heuristic-only; explicit "NOT VALIDATED" prefix REQUIRED.
+
+findings_unclassified:                           # OPTIONAL — sketch list, max 15
+  _quality: draft
+  # [llm-draft] flag-only findings — what stood out during single-pass
+  # synthesis. Production Scaffold's Phase 6 classifies these (block /
+  # defer / adopt-as-divergence); Snapshot does NOT.
+  # Hard cap: 15 findings. If more than 15 surface, prune to the most
+  # signal-bearing — the Snapshot is "what evaluators should know
+  # at a glance," not exhaustive.
+  - topic: <string>                              # short title (e.g. "vocab-near-miss: hover ↔ hovered")
+    observation: <string>                        # one paragraph — what was seen
+    evidence_path: <string>                      # walker-output path or token-MCP reference
+    # NO decision field. NO severity field. NO defer/block vocab.
+    # The renderer prints these as plain bullets under a "DRAFT —
+    # UNCLASSIFIED" banner. Classification is upgrade-path territory.
+
+# ═══════════════════════════════════════════════════════════════════
+# SHAPE COMPATIBILITY WITH PRODUCTION PROFILE
+# ═══════════════════════════════════════════════════════════════════
+#
+# A snapshot.profile.yaml is NOT a drop-in replacement for a Profile.
+# Differences:
+#   - Top-level keys are SUBSET of Profile spec — `name`, `version`,
+#     `description` are folded into `metadata:`; `categories:`, `assets:`,
+#     `naming:`, `standalone_tokens:`, `token_sources:` are absent.
+#   - Best-effort sections carry `_quality: draft` (Profile rejects this key).
+#   - `findings_unclassified:` is Snapshot-only (Profile has no findings inline).
+#
+# Upgrade lift: cdf-profile-scaffold takes this file as Phase-1 seed,
+# re-keys `metadata.ds_name` → `name`, expands best-effort sections via
+# the Production synthesis flow, and emits a validator-checkable
+# `<ds>.profile.yaml`. The seed is read-only input, never round-tripped.

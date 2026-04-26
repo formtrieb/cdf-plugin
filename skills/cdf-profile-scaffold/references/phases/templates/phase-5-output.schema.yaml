@@ -1,0 +1,103 @@
+# phase-5-output.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of the `phase-5-output.yaml` artefact produced on the
+# **T1/T2 path** by Phase 5 (Interaction + A11y). T0 retains the legacy
+# `<ds>.phase-5-notes.md` markdown.
+#
+# Phase 5 is the smallest mechanical-seeding surface: ~100% LLM
+# synthesis off the ingested Phase-1 doc-frames, Phase-1 utility-
+# component classification (Rule F), Phase-2 vocabularies, Phase-3
+# grammars, Phase-4 theming axes. The schema below mostly captures
+# the synthesis output in named slots so Phase 6 can iterate.
+#
+# Field annotations:
+#   [walker]   — only `schema_version` / `generated_at` / `generated_by`
+#                are walker-emitted. There are no inline-jq seeders for
+#                this phase.
+#   [llm]      — everything else.
+#
+# Each `seeded_findings[]` entry follows `seeded-findings.schema.yaml`.
+# Phase 6 hard-asserts `schema_version`.
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-phases-2-6.md
+#   - Skill: ../phase-5-interaction-a11y.md §1
+#   - Producer: pure LLM synthesis (no MCP / jq seeding)
+#   - Consumer: Phase 6 (yq ea '.seeded_findings[]' phase-*-output.yaml)
+
+schema_version: phase-5-output-v1            # [walker] — Phase 6 hard-asserts
+
+generated_at: <ISO 8601 UTC>                 # [walker]
+generated_by:                                # [walker]
+  source_phase_4: <relative path to phase-4-output.yaml>
+  tier: T1
+
+# ── LLM: focus-strategy classification ─────────────────────────
+focus_strategy:                              # [llm]
+  pattern: variant-boolean | utility-component | css-delegated | implicit-via-stroke
+  evidence: <string>                         # citation back to doc-frame / variant-axis / utility component
+  utility_component: <string | null>         # e.g. "Focus Ring (id: 123:456)" when pattern == utility-component
+
+# ── LLM: utility-components confirmed (Rule F) ─────────────────
+# Phase-1 walker classified standalones; Phase-5 confirms with User
+# which of those participate in cross-cutting concerns.
+utility_components:                          # [llm]
+  - name: <string>
+    role: focus-ring | divider | tooltip-backdrop | scrim | selection-indicator | other
+    used_by: [<component-name>, ...]         # composition citations
+    notes: <string>
+
+# ── LLM: interaction-pattern catalog ───────────────────────────
+# One block per pattern the DS uses. Patterns are the DS-level
+# abstraction; component_pattern_map (below) binds components to them.
+interaction_patterns:                        # [llm]
+  <pattern-name>:                            # e.g. pressable, focusable, selectable, expandable, progress
+    description: <string>
+    states: [<string>, ...]                  # pattern's state vocab (subset of Phase-2 system_vocabularies.state)
+    token_layer: <string | null>             # name of a Phase-3 token_layers[] entry (e.g. "Controls").
+                                             # NOT a grammar key (e.g. "color.controls") — validator L4 rejects.
+    token_mapping:                           # state → token-context mapping
+      <state>: <token-state>
+    promoted: [<state>, ...]                 # states promoted to property (per Mirrors-State F4 pattern)
+    orthogonal_to: [<pattern-name>, ...]     # other patterns this composes with cleanly
+
+# ── LLM: per-component pattern map ─────────────────────────────
+component_pattern_map:                       # [llm]
+  <component-name>: [<pattern-name>, ...]
+
+# ── LLM: accessibility-defaults block ──────────────────────────
+# Aligns with the AccessibilityDefaults fragment of CDF-PROFILE-SPEC
+# (load via `cdf_get_spec_fragment({ fragment: "AccessibilityDefaults" })`).
+# Step 5.6 derives this from doc-frames + variant-state vocab + theming.
+accessibility_defaults:                      # [llm]
+  min_target_size:
+    value: <token-path-or-pixel-string>      # e.g. "controls.height.base" or "44px"
+    by_device:                               # if Phase-4 device axis exists
+      <device-mode>: <token-path>
+  focus_visible:
+    pattern: <ref to focus_strategy.pattern>
+    color_token: <token-path | null>
+  motion:
+    reduced_motion_supported: <bool>
+    default_duration: <token-path | null>
+  color_contrast:
+    text_aa_default: <bool>
+    notes: <string>
+
+# ── Seeded findings ────────────────────────────────────────────
+# No mechanical seeds in this phase — every entry is LLM-authored
+# from the synthesis steps. Common cluster D candidates:
+#   focus-strategy classification needing User sign-off,
+#   pattern with no token-grammar backing,
+#   a11y-defaults first-write.
+seeded_findings:                             # [llm]
+  - <per seeded-findings.schema.yaml>
+
+# ── LLM-additions zone ─────────────────────────────────────────
+interpretation: []                           # [llm]
+
+# ── Phase-6 handoff ────────────────────────────────────────────
+# Phase 6 reads `seeded_findings[]` via the union-pattern; this slot
+# is intentionally empty (no structural carry-forward to Phase 6 —
+# the findings union IS the carry-forward).
+phase_6_inputs: {}                           # [llm — empty by design]

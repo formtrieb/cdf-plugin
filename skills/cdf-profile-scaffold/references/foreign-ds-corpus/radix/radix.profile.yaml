@@ -1,0 +1,152 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Radix Primitives — CDF Profile (foreign-DS validation pass)
+# CDF Profile Format v1.0.0-draft.5
+#
+# Scope: Separator + Toggle only. This Profile is NOT a complete Radix model;
+# it is the smallest legal Profile that lets those two components validate,
+# authored to surface format frictions. See ../docs/BIG-DS-RADIX-BRIEF.md.
+#
+# Token strategy (fixed per the brief): Pure-Radix means NO tokens. Every
+# token-shaped field is empty or absent. The shadcn/ui token-bridge concern
+# is a separate later exercise.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Identity ─────────────────────────────────────────────────────────────────
+
+name: Radix
+version: "0.1.0-draft"
+cdf_version: ">=1.0.0-draft <2.0.0"
+dtcg_version: "2025.10"
+description: >
+  Headless primitives from @radix-ui/react-primitives. No visual contract —
+  Radix ships behaviour + accessibility + keyboard handling; consumers bring
+  their own styles. This Profile models only the two primitives (Separator,
+  Toggle) needed to stress the CDF format against a composition-first,
+  style-less DS.
+
+# ── Vocabularies ─────────────────────────────────────────────────────────────
+# Only the vocabularies the ported components actually reference. Radix's
+# full vocabulary (orientation, dir, side, align, …) would be added as more
+# primitives are ported.
+
+vocabularies:
+
+  orientation:
+    description: >
+      Layout axis for Separator and any oriented container. Radix exposes
+      this as the `orientation` prop and surfaces it at runtime via
+      `data-orientation` for CSS hooks.
+    values: [horizontal, vertical]
+
+# ── Token Grammar ────────────────────────────────────────────────────────────
+# Empty by design. Radix primitives declare no visual contract, so there are
+# no legal token paths. See findings.md F-Radix-1 — empty `token_grammar: {}`
+# is legal per Profile §6.1 schema (the key is REQUIRED but the map may be
+# empty), but the DOWNSTREAM Component rule "tokens: REQUIRED" in Component
+# §3 / structural checker means each ported Component will still be pressed
+# to declare a `tokens:` block.
+
+token_grammar: {}
+
+token_layers: []
+
+# ── Theming ──────────────────────────────────────────────────────────────────
+# Radix has no theming axes — CSS styling is entirely the consumer's
+# problem. `theming: {}` is legal per Profile §8 (every sub-block is
+# optional when the DS declares no modifiers).
+
+theming: {}
+
+# ── Naming ───────────────────────────────────────────────────────────────────
+# Identifier `rdx` is Radix-Primitives-appropriate (short, lowercase, unique
+# against `ft` and `mp`). Casing follows Profile §9 defaults — we're not
+# changing how names are cased, only who owns them.
+
+naming:
+  identifier: rdx
+  casing:
+    component_names: PascalCase
+    properties: camelCase
+    token_paths: camelCase
+  reserved_names: {}
+
+# ── Interaction Patterns ─────────────────────────────────────────────────────
+# Three patterns — only what Separator and Toggle need.
+#
+#   `static`      — Separator: non-interactive.
+#   `pressable`   — Toggle's pointer/keyboard activation surface.
+#   `toggleable`  — Toggle's on/off axis (mirrored from the `pressed` prop).
+#
+# `toggleable` is NEW in this Profile. It is close to Formtrieb's `selectable`
+# but is intentionally a distinct name: Radix Toggle's `pressed` axis is
+# DOM-observable via `data-state="on|off"`, not a selection per se.
+# Headless → no `token_layer`, no `token_mapping`. See findings.md for
+# whether `token_layer:` should be optional in the spec (it already is per
+# §10.1, but the parser requires `interaction_patterns` to exist).
+
+interaction_patterns:
+
+  static:
+    description: >
+      Non-interactive element — one state, no transitions. Used by
+      decorative Separators and other purely visual primitives.
+    states: [enabled]
+
+  pressable:
+    description: >
+      Direct click/tap activation. Radix Toggle's button surface emits
+      pointer/keyboard events to flip the toggleable axis. Standard four
+      values.
+    states: [enabled, hover, pressed, disabled]
+    promoted: [disabled]
+
+  toggleable:
+    description: >
+      Binary on/off axis. Radix surfaces this via `data-state="on|off"`
+      and ARIA `aria-pressed`. Orthogonal to `pressable` — a Toggle can
+      be both `hover` and `on` simultaneously.
+    states: [off, on]
+    orthogonal_to: [pressable]
+    promoted: [on]
+
+# ── Accessibility Defaults ───────────────────────────────────────────────────
+# Radix's headline feature is a11y, but at the Profile level we only need
+# the category baselines. Per-component keyboard/aria live in the Component
+# specs (Separator has none; Toggle has Enter/Space).
+
+accessibility_defaults:
+
+  category_defaults:
+    Primitive:
+      focus_visible: false
+      element: span
+    Interactive:
+      focus_visible: true
+      element: button
+      keyboard: pressable
+
+# ── Categories ───────────────────────────────────────────────────────────────
+# Two categories — enough for Separator (Primitive) and Toggle (Interactive).
+# No `token_grammar:` key on either — the DS has no grammar to bind to.
+#
+# NOTE on §12.2 "category interaction default": Primitive defaults to
+# `static`, Interactive to `pressable`. Toggle composes `pressable` with
+# `toggleable` via `orthogonal_to:`, consistent with §12.2's
+# "additive composition permitted" rule.
+
+categories:
+
+  Primitive:
+    description: >
+      Non-interactive decorative or structural elements. Radix Separator
+      lives here. Consumers style freely; the component contributes only
+      semantics + ARIA.
+    interaction: static
+    examples: [Separator]
+
+  Interactive:
+    description: >
+      Components that handle user input. Radix Toggle lives here.
+      Composition of pressable (event surface) + toggleable (state axis).
+    interaction: pressable
+    examples: [Toggle]

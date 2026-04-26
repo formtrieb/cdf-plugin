@@ -1,0 +1,337 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Primer — CDF Profile (foreign-DS validation pass, DTCG-bridge focus)
+# CDF Profile Format v1.0.0-draft.7
+#
+# Scope: Button + Label only. This Profile models the token surface of
+# GitHub's @primer/primitives DS at commit c19e78df..., pinned in
+# <ds-test-dir>/.primer-primitives (gitignored). See BIG-DS-PRIMER-BRIEF.md
+# and findings.md F-primer-0 for provisioning detail + layout deviation.
+#
+# Token-bridge strategy: (γ) evolved — the brief pre-committed (γ)
+# with prose ownership; the brief also budgeted ≤25 `standalone_tokens`
+# as the MECHANISM. Primer's source is natively grammar-shaped
+# (`button.{variant}.{element}.{state}`), so the mechanically-honest
+# form is `token_grammar` entries whose `description:` fields carry the
+# same "external — from @primer/primitives …" prose ownership signal.
+# The (γ) PRINCIPLE (prose-ownership, zero new format fields) holds;
+# the structural mechanism adapts to the shape of the source. Logged
+# as F-primer-1 — this is what the budget tripwire caught.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Identity ─────────────────────────────────────────────────────────────────
+
+name: Primer
+version: "0.1.0-draft"
+cdf_version: ">=1.0.0-draft <2.0.0"
+dtcg_version: "2025.10"
+description: >
+  GitHub's Primer design system distilled to CDF. Source:
+  @primer/primitives v-pinned at c19e78df9f3b98a9be4ee5da8bd7f8cb5b74298f
+  (see <ds-test-dir>/.primer-primitives, gitignored). Only Button and
+  Label are modelled — deliberately the smallest DTCG-bridge stress
+  test the brief calls for.
+
+  Primer ships REAL DTCG 2025.10: `$value`, `$type`, `$description`,
+  `$extensions`. Per-mode values are encoded inline via
+  `$extensions.org.primer.overrides` rather than parallel per-theme
+  files (see F-primer-0). This Profile declares only the Light + Dark
+  axis; eight+ vision-accommodation variants (dark-dimmed,
+  dark-tritanopia-high-contrast, etc.) are deferred per brief and
+  logged as future-scope in F-primer-2.
+
+# ── Vocabularies ─────────────────────────────────────────────────────────────
+# Primer Button and Label have DISJOINT variant vocabularies at the
+# API surface, so they live in two scoped vocabs. No value overlap:
+# `default` appears only in `button_variant`; Label uses color-keyed
+# scheme values from `label_scheme`. Profile §5.5 rule 5 (vocab values
+# disjoint across all vocabularies) is satisfied.
+#
+# Why color-keyed Label values? The Primer React Label ships a semantic
+# `variant` prop (`accent | success | attention | severe | danger | done
+# | sponsors`) that maps INTERNALLY to colour-keyed tokens (`blue`,
+# `green`, `yellow`, `orange`, `red`, `purple`, `pink`). The token tree
+# at src/tokens/component/label.json5 keys by COLOUR not by semantic
+# name — there is no `label.accent.bgColor` token, only
+# `label.blue.bgColor`. Modelling Label at the token layer (which is
+# what this Profile must do to bind honestly) means colour-keyed
+# variants. The semantic → colour mapping is a React-layer concern
+# outside CDF's scope. Logged as F-primer-6.
+
+vocabularies:
+
+  button_variant:
+    description: >
+      Visual/semantic role for Button. All five values match keys in
+      @primer/primitives src/tokens/component/button.json5:
+        - default   (low-emphasis grey fill)
+        - primary   (high-emphasis green CTA)
+        - danger    (destructive-action red fill)
+        - invisible (no fill, hover-only surface)
+        - outline   (transparent fill + bordered, deprecated-ish)
+      Out of scope: `inactive` (a disabled-alike), `star`
+      (a special-purpose follow button). These exist in Primer's
+      token file but are not in the modelled Button surface.
+    values: [default, primary, danger, invisible, outline]
+
+  button_size:
+    description: >
+      Scale axis for Button: small, medium, large (Primer's canonical
+      three). Primer implements size via CSS classes + sizing tokens
+      (`control.{size}.size`, paddings, font) rather than per-Button
+      colour tokens. The Component spec exposes the property but has
+      no per-size entries in the `tokens:` block for colour — mirrors
+      the F-shadcn-2 pattern (utility-owned axis) and is re-logged as
+      F-primer-5 (second-DS evidence for the deferred `target_only`
+      flag decision).
+    values: [small, medium, large]
+
+  label_scheme:
+    description: >
+      Visual role for Label, keyed by COLOUR name rather than by
+      semantic intent. Values correspond 1:1 to keys in
+      @primer/primitives src/tokens/component/label.json5:
+      `{gray, blue, green, yellow, orange, red, purple}`. A reduced
+      seven-value subset of Primer's full 19-colour Label vocabulary
+      — enough to cover the semantic spectrum (neutral, accent,
+      success, attention, severe, danger, done) without enumerating
+      the full perceptual range. Primer's React Label wraps these
+      with a semantic `variant` prop; that mapping is React-layer.
+    values: [gray, blue, green, yellow, orange, red, purple]
+
+  interaction_state:
+    description: >
+      Primer's per-component interaction-state axis — keyed by the
+      leaf names used inside its DTCG token tree. `rest` (not
+      `enabled`), `active` (not `pressed`). `selected` exists only on
+      a subset of components (Button default.bgColor has it) and is
+      out of scope for Button + Label.
+    values: [rest, hover, active, disabled]
+
+# ── Token Grammar — Button + Label families ──────────────────────────────────
+# Two `token_grammar` entries, one per component. Each pattern matches
+# every leaf path Primer's token tree contains for that component
+# within the modelled-variant subset. The (γ) prose ownership lives in
+# the `description:` field on each grammar entry (and is REDUNDANT at
+# leaf level because DTCG itself provides `$description` — the prose
+# says WHERE each leaf sits in the upstream repo, the DTCG $description
+# provides per-leaf documentation and is authoritative).
+
+token_grammar:
+
+  color.button:
+    pattern: "color.button.{variant}.{element}.{state}"
+    dtcg_type: color
+    description: >
+      external — Primer Button token family. Source: @primer/primitives
+      src/tokens/component/button.json5 (pinned at
+      c19e78df9f3b98a9be4ee5da8bd7f8cb5b74298f). Values per mode live
+      inline via `$extensions.org.primer.overrides` — CDF treats the
+      resolution as a token-toolchain concern (draft.7 Profile §6
+      Build-time Enumerability). The DS owns the values; this Profile
+      merely re-surfaces the shape.
+
+      Per-token DTCG `$type: color` is mirrored by the grammar's
+      `dtcg_type` — redundant at leaf level, but discoverable for
+      anyone reading the Profile without diving into DTCG source.
+    axes:
+      variant:
+        vocabulary: button_variant
+      element:
+        description: >
+          Primer Button anatomy. `bgColor` = fill, `fgColor` = label
+          text + inline glyphs, `borderColor` = stroke. `shadow` and
+          `iconColor` exist in the upstream token tree for a few
+          variants (primary) but are out of scope here — the spec
+          binds only the three core element tokens.
+        values: [bgColor, fgColor, borderColor]
+      state:
+        vocabulary: interaction_state
+
+  color.label:
+    pattern: "color.label.{scheme}.{element}.{state}"
+    dtcg_type: color
+    description: >
+      external — Primer Label token family. Source: @primer/primitives
+      src/tokens/component/label.json5 (same pinned SHA). Label's token
+      tree is colour-keyed (not semantic); the seven-value subset here
+      covers neutral-through-purple, which is what the Component spec
+      will bind to. Primer's React surface wraps these colours with
+      semantic `variant` names — see F-primer-6 for the mapping note.
+
+      Note: Label carries rest/hover/active states in its DTCG tree
+      even though Label is a Primitive (no pointer events at the DS
+      level). The Component spec binds only the `rest` state; the
+      other states exist in this grammar for future cross-component
+      use (e.g. a `ClickableLabel` primitive) without needing a
+      Profile extension.
+    axes:
+      scheme:
+        vocabulary: label_scheme
+      element:
+        description: >
+          Label anatomy. Mirrors Button's core three: fill, label
+          colour, stroke.
+        values: [bgColor, fgColor, borderColor]
+      state:
+        vocabulary: interaction_state
+
+# ── Token Layers ─────────────────────────────────────────────────────────────
+# Primer's token tree layers are:
+#   base/       — primitives (colour/motion/size/typography)
+#   functional/ — semantic mappings (fgColor, bgColor, control, …)
+#   component/  — per-component compositions (button, label, …)
+# This Profile models only the `component/` layer via the two grammars
+# above. No token_layers membership is declared — Primer's layering
+# happens through reference chains in DTCG (`{control.fgColor.rest}`
+# inside a button leaf), not through CDF layer-based cascade resolution.
+
+token_layers: []
+
+# ── Standalone Tokens ────────────────────────────────────────────────────────
+# True singletons only. Two entries:
+#   radius.default — Primer's base corner radius reused by both
+#     components.
+#   color.focus.outline — Button's focus-visible ring; Label has none.
+#
+# Per the budget discussion in F-primer-1: token_grammar absorbed the
+# Button+Label surface with 2 entries (one per component). Adding these
+# two singletons brings total non-grammar token declarations to 2
+# entries. The brief's ≤25 standalone_tokens budget is satisfied
+# trivially — the mechanism shift (standalone → grammar) is what saved
+# the budget, not the enumeration. Logged explicitly because the
+# budget would have been exceeded had we insisted on enumerate-every-
+# leaf-as-standalone_token.
+
+standalone_tokens:
+
+  radius.default:
+    dtcg_type: dimension
+    description: >
+      external — base corner radius, ~6px in light mode. Primer
+      exposes this as a design-token primitive referenced by both
+      Button and Label. Source: @primer/primitives
+      src/tokens/base/size (resolved through functional/size/border).
+
+  color.focus.outline:
+    dtcg_type: color
+    description: >
+      external — focus-visible outline colour. Source:
+      @primer/primitives src/tokens/component/focus.json5. Single-ring
+      pattern, not double-ring — mirrors the F-shadcn-5 observation
+      (second DS using a single-ring focus). Cross-reference
+      F-primer-4 for the §13.5 focus-block vs. plain `outline-color:`
+      discussion.
+
+# ── Theming ──────────────────────────────────────────────────────────────────
+# Primer ships a rich theme matrix — eight+ variants covering light/dark
+# × vision-accommodation (colorblind, tritanopia, high-contrast, dimmed).
+# All of them resolve through ONE token-tree entry per path, selecting
+# by `$extensions.org.primer.overrides.<mode>` at toolchain level.
+#
+# Decision (per brief pre-commit): CDF Profile declares only the
+# Light / Dark canonical axis. Vision-accommodation variants are
+# future-scope — F-primer-2 captures the one-axis-eight-values vs.
+# two-axes-semantic×accommodation trade-off with rationale.
+#
+# `set_mapping: {}` because Primer has no discrete TOKEN SETS for
+# mode; the whole token tree is one set and the toolchain selects per
+# mode from `$extensions.org.primer.overrides`.
+
+theming:
+  modifiers:
+    semantic:
+      description: >
+        Canonical Light / Dark. Values per mode live inline in Primer's
+        DTCG via `$extensions.org.primer.overrides.{mode}` on each
+        leaf. Primer's toolchain materialises one CSS file per mode;
+        CDF treats the resolution as toolchain-owned (Build-time
+        Enumerability, Profile §6 draft.7).
+      values: [Light, Dark]
+  set_mapping: {}
+
+# ── Naming ───────────────────────────────────────────────────────────────────
+# `pr` is short and disjoint from `ft` (Formtrieb), `mp` (Formtrieb),
+# `rdx` (Radix), `sh` (shadcn). Casing at CDF defaults.
+
+naming:
+  identifier: pr
+  casing:
+    component_names: PascalCase
+    properties: camelCase
+    token_paths: camelCase
+  reserved_names: {}
+
+# ── Interaction Patterns ─────────────────────────────────────────────────────
+# Two patterns — reused from Radix / shadcn shape but with Primer's
+# vocabulary for states (rest/hover/active/disabled, see
+# interaction_state vocab above).
+#
+# `pressable` is Button's surface. `static` is Label's. Token-axis
+# mapping for pressable: the four pattern states map 1:1 to
+# interaction_state values (enabled→rest, pressed→active).
+
+interaction_patterns:
+
+  static:
+    description: >
+      Non-interactive — Label. One state forever. The token tree
+      carries hover/active entries for Label but a Primitive
+      Component never addresses them.
+    states: [enabled]
+
+  pressable:
+    description: >
+      Pointer + keyboard activation — Button. Maps to Primer's
+      rest/hover/active/disabled state vocabulary via token_mapping.
+    states: [enabled, hover, pressed, disabled]
+    token_mapping:
+      enabled: rest
+      hover: hover
+      pressed: active
+      disabled: disabled
+    promoted: [disabled]
+
+# ── Accessibility Defaults ───────────────────────────────────────────────────
+
+accessibility_defaults:
+
+  focus_ring:
+    description: >
+      Single-ring focus indicator — `color.focus.outline` applied as
+      outline. Primer ships this via `:focus-visible` CSS, not an
+      inset double-ring.
+    pattern: single-ring
+    token_group: focus.outline
+
+  category_defaults:
+    Primitive:
+      focus_visible: false
+      element: span
+    Interactive:
+      focus_visible: true
+      element: button
+      keyboard: pressable
+
+# ── Categories ───────────────────────────────────────────────────────────────
+# Primitive (Label) + Interactive (Button). Matches the shadcn shape.
+# `token_grammar:` membership on each category points Components to
+# the right grammar family for binding. No Status / Layout / Overlays
+# needed for this two-component pass.
+
+categories:
+
+  Primitive:
+    description: >
+      Non-interactive labelling / decorative elements. Label sits here
+      — variant-driven colour only, no pointer or keyboard surface.
+    interaction: static
+    token_grammar: color.label
+    examples: [Label]
+
+  Interactive:
+    description: >
+      User-input Components. Button sits here — variant × size cross-
+      product, full pressable state coverage.
+    interaction: pressable
+    token_grammar: color.button
+    examples: [Button]

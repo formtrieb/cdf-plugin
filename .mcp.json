@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cdf-mcp": {
+      "command": "npx",
+      "args": ["-y", "@formtrieb/cdf-mcp@^1.7.0"]
+    }
+  }
+}

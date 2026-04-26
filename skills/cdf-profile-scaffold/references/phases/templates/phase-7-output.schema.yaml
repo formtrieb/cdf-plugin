@@ -1,0 +1,318 @@
+# phase-7-output.schema.yaml  (contract / reference — not runtime-validated)
+#
+# Canonical shape of the final `<ds>.profile.yaml` artefact emitted in
+# Phase 7. Copy this file's structure, substitute the `<placeholder>`
+# tokens with Phase-6-derived values, delete sections that don't apply
+# (annotations below mark which are REQUIRED vs optional), and Write.
+# Then run `cdf_validate_profile` — a template-faithful emit passes
+# L0–L7 on the first try.
+#
+# Canonical shape authority: the CDF-PROFILE-SPEC fragments under
+# `cdf/specs/profile/`, loaded on-demand via
+# `cdf_get_spec_fragment({ fragment: "<Name>" })`. The monolith at
+# `cdf/specs/CDF-PROFILE-SPEC.md` is a generated publication artefact.
+# If this template and any fragment disagree, the fragment wins; file a
+# bug.
+#
+# Field annotations:
+#   [config-derived]    — value flows in from .cdf.config.yaml (name,
+#                         version, output path, parent profile path).
+#   [phase-6-derived]   — value flows in from `phase_6_output.profile_inputs`
+#                         (vocabularies, grammars, theming, patterns,
+#                         a11y, categories). Phase 6 already classified
+#                         and filtered the upstream seeds; Phase 7 does
+#                         not re-decide.
+#   [llm]               — LLM composes from assembled inputs (typically
+#                         identity `description`, block findings
+#                         placeholders, cross-references between
+#                         sections).
+#   [template-fill]     — structural scaffolding only (section headers,
+#                         literal YAML shape). Kept in the emit verbatim.
+#
+# Pitfall markers:
+#   (★1) vocabulary object-shape — `<name>: {description, values}`,
+#        NEVER a bare value list.
+#   (★2) boolean-axis values MUST be quoted strings — `["false", "true"]`,
+#        never the YAML bool literals.
+#   (★3) token_grammar is an object map keyed by grammar name, NEVER a
+#        list of `{name, …}` objects.
+#   (★4) every grammar entry has a REQUIRED `dtcg_type`. Don't omit.
+#   (★5) token_sources.sets is a map of `<set-path>: <single-filename>`.
+#        Multi-file groups are modelled as sibling keys, not a list
+#        value under one key.
+#   (★6) `extends:` is a string path OR the field is omitted entirely.
+#        `extends: null` fails the L1 type-check — drop the field.
+#   (★7) standalone_tokens is a map of leaf paths only; each entry has
+#        REQUIRED `dtcg_type` + `description`. Namespaces (`colors`,
+#        `shadow`, `Display`, …) are grammar candidates, never
+#        standalones. Flat lists are not accepted.
+#
+# Related:
+#   - Plan: docs/plans/active/2026-04-23-lever-2a-followups.md Task 1
+#   - Skill: ../phase-7-emit-validate.md §7.1
+#   - Producer: LLM (template-fill during Phase 7)
+#   - Consumer: cdf-mcp `cdf_validate_profile` (L0–L7, optional L8)
+#   - Reference emit: the Lever-2A Scope-A end-to-end real-run (2026-04-23)
+#     produced a working-fixture `<ds>.profile.yaml` under the scaffold
+#     test-dir; it passes L0–L7 clean (+15 advisory vocab-isolation
+#     warnings). Check your test-dir for the current reference file.
+
+# ── Identity ─────────────────────────────────────────────────── [template-fill]
+name: <PascalCase DS name>                    # [config-derived] REQUIRED — §4.1
+version: "<semver>"                           # [config-derived] REQUIRED — §4.2 (e.g. "1.0.0")
+cdf_version: ">=1.0.0 <2.0.0"                 # [config-derived] REQUIRED — §4.3 (semver range)
+
+# [optional] dtcg_version — include iff token_grammar references DTCG
+# types. Date-based (e.g. "2025.10"). Omit for DS without DTCG tokens.
+dtcg_version: "<YYYY.MM>"                     # [config-derived] optional — §4.4
+
+# [optional, ★6] extends — relative path to parent profile (single-level
+# only per §15.6). **OMIT THE FIELD ENTIRELY** for self-contained
+# profiles. Do NOT emit `extends: null` — that fails L1 type-check.
+# When present, inherited sections MAY be omitted below (see
+# phase-7-emit-validate.md §7.1.1 decision table).
+# extends: ../formtrieb.profile.yaml          # [config-derived] optional — §4.5
+
+description: >                                # [llm] REQUIRED — §4.6
+  <1–3 sentences: what this DS is, its scope, any migration context
+  the reader should know. Under 120 words. Read by humans + LLMs.>
+
+# ── Vocabularies ─────────────────────────────────────────────── [phase-6-derived]
+# §5. Map of vocabulary-name → {description, values}. NEVER a bare
+# list. Every entry declares BOTH description and values.
+#
+# (★1) object-shape rule:
+#     hierarchy:                       ← key
+#       description: <prose>           ← REQUIRED
+#       values: [brand, primary, ...]  ← REQUIRED
+#   NOT:
+#     hierarchy: [brand, primary, ...]     ← invalid (bare list)
+#     hierarchy:                           ← invalid (missing description)
+#       values: [brand, primary, ...]
+#
+# (★2) boolean-axis rule:
+#     hasValue:
+#       description: "..."
+#       values: ["false", "true"]      ← QUOTED strings
+#   NOT:
+#     hasValue:
+#       values: [false, true]          ← invalid (YAML-bool literals)
+#
+# Phase 2 system_vocabularies — filtered by Phase-6 decisions to the
+# adopted shape — is the direct source. A value-list with two items
+# {"false", "true"} indicates a boolean axis; keep the quotes.
+vocabularies:
+  <vocab_name>:                               # snake_case key
+    description: <one-sentence meaning>       # REQUIRED — what this vocab is FOR
+    values: [<v1>, <v2>, ...]                 # REQUIRED — ordered canonical list
+
+  <boolean_vocab_name>:                       # e.g. selected, indeterminate, expanded
+    description: <one-sentence meaning>
+    values: ["false", "true"]                 # (★2) quoted strings, not bool literals
+
+  # Optional fields per §5.1: casing, aliases, per_category, notes.
+  # Include only when Phase 2 surfaced a concrete need.
+
+# ── Token grammar ────────────────────────────────────────────── [phase-6-derived]
+# §6. Object map keyed by grammar name (dotted prefix). NEVER a list.
+#
+# (★3) grammar object-shape rule:
+#     token_grammar:
+#       color.controls:                 ← key is the grammar's dotted prefix
+#         dtcg_type: color              ← (★4) REQUIRED
+#         pattern: "color.controls.{hierarchy}.{element}.{state}"
+#         axes: { ... }
+#   NOT:
+#     token_grammar:                    ← invalid (list shape)
+#       - name: color.controls
+#         pattern: ...
+#
+# (★4) dtcg_type rule: EVERY grammar entry declares `dtcg_type`. Skip
+#   produces an L2 schema error. Currently accepted values: color,
+#   typography, dimension, shadow, border, duration, cubicBezier,
+#   number, fontFamily, fontWeight (see §6.3).
+token_grammar:
+  <grammar_name>:                             # e.g. color.controls, color.text, dimension.spacing
+    dtcg_type: <type>                         # (★4) REQUIRED — DTCG $type
+    pattern: "<prefix>.{<axis1>}.{<axis2>}"   # REQUIRED — dotted template
+    axes:                                     # REQUIRED — one entry per placeholder
+      <axis1>:
+        vocabulary: <vocab_name>              # OR values: [...] inline
+      <axis2>:
+        values: [<v1>, <v2>, ...]
+        description: <why these values>       # required when inline
+    # Optional:
+    # description: <one-sentence grammar meaning>
+    # contrast_guarantee: <see §6.5>
+    # resolution: <see §6.12 — required iff {state}-slot is collapsed>
+
+# ── Token layers (optional) ────────────────────────────────── [phase-6-derived]
+# §6.10. Ordered list (NOT a map). Declares the reference cascade
+# between grammar groups. Omit entirely if the DS has no layered
+# cascade (equivalent to "flat reference graph, no cascade
+# enforcement").
+# token_layers:
+#   - name: Foundation
+#     description: <what lives here>
+#     grammars: []                            # optional — grammar names from above
+#   - name: Controls
+#     description: <...>
+#     grammars: [color.controls, color.system-status]
+#     references: [Foundation]
+
+# ── Standalone tokens (optional) ─────────────────────────────── [phase-6-derived]
+# §6.11. Leaves that don't fit any grammar pattern (singletons, small
+# flat enumerations).
+#
+# (★7) leaf-only rule: EVERY entry MUST be a leaf path in the DTCG
+#   corpus, with a declared `dtcg_type` and `description`. If you find
+#   yourself writing a namespace (e.g. `colors`, `shadow`, `Display`,
+#   `dimension`) — STOP. That is a grammar candidate, not a standalone.
+#   A namespace has children with their own values; a leaf resolves
+#   directly to a single value (or to a small flat enumeration listed
+#   inline under `values:`).
+#
+# Single canonical shape per §6.11.1 — object map keyed by leaf path:
+#
+#   standalone_tokens:
+#     color.page:
+#       dtcg_type: color                       # REQUIRED — DTCG $type
+#       description: <one sentence>            # REQUIRED — non-empty
+#       values: [primary, secondary]           # optional — small inline enum
+#       layer: Components                      # optional — token_layers[].name
+#     focus.outer:
+#       dtcg_type: color
+#       description: <one sentence>
+#
+# Phase 3 verifies leaf-ness via `browse_tokens(path_prefix=$path,
+# depth=1)` before promoting a path to standalone. See
+# phase-3-grammars.md Step 3.2 self-check.
+standalone_tokens: {}                         # optional — omit if empty
+
+# ── Token sources (optional) ─────────────────────────────────── [phase-6-derived]
+# §7. Locates the DTCG JSON files. Omit for abstract profiles that
+# ship vocabulary only and leave tokens to extenders.
+#
+# (★5) sets-shape rule: `sets` is a map of `<set-path>: <single-filename>`.
+#   EACH key is one set, not a logical group. A DS with multiple files
+#   per theme mode models them as sibling keys, NEVER as a list value.
+#
+#     token_sources:
+#       directory: ./tokens
+#       format: tokens-studio                 # optional — default is tokens-studio
+#       sets:
+#         "Foundation/Foundation":       Foundation/Foundation.json
+#         "Foundation/HelpersFoundation": Foundation/HelpersFoundation.json
+#         "Semantic/Light":              Semantic/Light.json
+#         "Semantic/Dark":               Semantic/Dark.json
+#
+#   NOT:
+#     sets:
+#       Foundation: [Foundation/Foundation.json, ...]     ← invalid (list value)
+#       Semantic:                                         ← invalid (grouped key)
+#         - Semantic/Light.json
+#         - Semantic/Dark.json
+#
+# The set-name key SHOULD match the DTCG file's logical path without
+# the `.json` suffix (§7.4). Consumers resolve the full path as
+# `{directory}/{filename}`.
+token_sources:
+  directory: ./tokens                         # REQUIRED — relative to this profile
+  format: tokens-studio                       # optional — tokens-studio | dtcg-native
+  sets:                                       # REQUIRED
+    "<set-path-without-ext>": <filename.json> # (★5) one filename per key
+    # repeat per file
+
+# ── Theming ──────────────────────────────────────────────────── [phase-6-derived]
+# §8. modifiers + set_mapping. Both required whenever the DS declares
+# any mode-switch (Light/Dark, Desktop/Tablet/Mobile, etc.).
+theming:
+  modifiers:                                  # §8.2
+    <modifier_name>:                          # e.g. Semantic, Device, Shape
+      description: <what this modifier swaps>
+      contexts: [<Context1>, <Context2>]      # ordered list of legal values
+      # Optional but common:
+      default: <Context1>                     # one of contexts[]
+      required: true                          # default false
+      data_attribute: data-<modifier-name>    # HTML attr idiom (or css_class_pattern)
+      # figma_collection: <Figma variables collection name>
+      # affects: [<grammar-name>, ...]        # grammars this modifier may override
+
+  set_mapping:                                # §8.3 — REQUIRED when token_sources.sets present
+    # Every set in token_sources.sets MUST appear here (or be covered by
+    # a wildcard). Three legal entry shapes (examples — replace keys
+    # with real set names on emit; shown as comments so YAML parsers
+    # don't trip on duplicate `<set-key>` placeholder keys):
+    #   "Foundation/Foundation": { always_enabled: true }
+    #   "Semantic/Light":        { modifier: semantic, context: Light }
+    #   "Device/*":              { always_enabled: true }
+    {}  # replace with real entries
+
+# ── Naming ───────────────────────────────────────────────────── [phase-6-derived]
+# §9. DS-level identity + casing. Target-specific prefixes (CSS class,
+# token var, type prefix) live in the Target — NOT here.
+naming:
+  identifier: <ds-identifier>                 # REQUIRED — lowercase, a–z + hyphens, 2–4 chars
+  casing:                                     # REQUIRED
+    component_names: PascalCase
+    properties: camelCase
+    token_paths: camelCase
+  # Optional:
+  reserved_names: {}                          # optional — {name: rationale}
+
+# ── Interaction patterns (optional) ──────────────────────────── [phase-6-derived]
+# §10. One entry per pattern the DS uses. Patterns ARE the DS's
+# state vocabulary; omit entirely if the DS declares no patterns.
+interaction_patterns:
+  <pattern_name>:                             # snake_case — e.g. pressable, focusable
+    description: <what kind of component this covers>
+    states: [<state1>, <state2>, ...]         # REQUIRED — ordered component-facing names
+    # Optional:
+    # token_layer: <layer-name from token_layers[]>   # NOT a grammar key — validator L4 rejects
+    # token_mapping:
+    #   <component_state>: <token_path_state> # translation for non-identity maps
+    # orthogonal_to: [<pattern>, ...]         # compositional axes
+    # promoted: [<state>, ...]                # states exposed at component boundary
+
+# ── Accessibility defaults (optional) ────────────────────────── [phase-6-derived]
+# §11. Five optional blocks: focus_ring, min_target_size,
+# contrast_requirements, keyboard_defaults, category_defaults. Emit
+# only what Phase 5 actually produced. Unused blocks omit entirely.
+accessibility_defaults:
+  # focus_ring: {...}                         # §11.2
+  # min_target_size: {...}                    # §11.3
+  # contrast_requirements: {...}              # §11.4
+  # keyboard_defaults: {...}                  # §11.5
+  # category_defaults: {...}                  # §11.6
+  # focus_visible:                            # seen in real-run — prose-shape acceptable
+  #   pattern: <css-delegated | ring | ...>
+  #   color_token: <token-path>
+
+# ── Categories (optional) ────────────────────────────────────── [phase-6-derived]
+# §12. PascalCase keys, each with description + interaction + optional
+# token_grammar + examples. Alternative flat shape seen in real-run
+# emit (primitives/utility/widget/asset etc.) is also accepted — the
+# validator is structurally tolerant as long as the leaf shape holds.
+categories:
+  <CategoryName>:
+    description: <...>
+    interaction: <none | pressable | focusable>   # REQUIRED
+    # Optional:
+    # token_grammar: <grammar-name>
+    # examples: [<component>, ...]
+
+# ── Assets (optional) ────────────────────────────────────────── [phase-6-derived]
+# §13. Present only when the DS has concrete assets (icons, fonts).
+# assets:
+#   icons:
+#     naming_case: <snake | kebab | camel>
+#     sizes: [<s1>, <s2>, ...]
+#     origin:      { type: <figma | package | filesystem>, ... }
+#     consumption: { type: <typescript-registry | package-import | sprite-href>, ... }
+
+# ── Block-finding placeholders ───────────────────────────────── [llm]
+# For each Phase-6 finding with user_decision == "block", emit a
+# syntactically-valid stand-in in the relevant section above with an
+# inline comment `# TODO (see findings.md#§N)`. The Profile parses +
+# validates; the stand-in is visibly unresolved. See §7.1 of
+# phase-7-emit-validate.md for the block-finding emit rule.
