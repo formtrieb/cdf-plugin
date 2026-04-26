@@ -1,3 +1,10 @@
+---
+phase: 4
+title: Theming Modifiers
+requires: []  # synthesizes from phase-3-output + walker resolver output (already in phase-1-output.yaml)
+read_at: n/a
+---
+
 # Phase 4 · Theming Modifiers
 
 **Goal:** Derive the DS's theming-axes (semantic, device, shape, brand, …)

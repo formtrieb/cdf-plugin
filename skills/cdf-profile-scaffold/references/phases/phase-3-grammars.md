@@ -1,3 +1,11 @@
+---
+phase: 3
+title: Infer Token Grammars
+requires:
+  - shared/cdf-source-discovery/tool-leverage.md  # §2 Rule A enforcement (cited at Step 3.1.0); §4 Token enumeration paths block (Contract 4 fallback)
+read_at: step-3.1.0 (before declaring any token-source gap claim)
+---
+
 # Phase 3 · Infer Grammars
 
 **Goal:** Identify token-grammar patterns (`color.{axis}.{axis}.{state}`),
@@ -103,21 +111,34 @@ the artefact pre-dates the current schema.
 from the in-context vocabularies as before. Do not synthesize a YAML
 from the notes.
 
-### Step 3.1.0 — Tool-survey BEFORE gap-declaration (Rule-A enforcement)
+### Step 3.1.0 — Tool-survey BEFORE gap-declaration (Rule-A enforcement, L8.5-generalized)
 
-**Hard requirement.** Before declaring any token-source gap of the
-shape *"X NOT enumerable / NOT visible / NOT accessible / NOT available"*
-in this phase, the LLM MUST execute a tool-survey-and-probe. This rule
-applies to ALL runs but is especially load-bearing for **auto-mode**
-(no Phase-6 dialog brake) and on the **T1 path** (REST cache file
-visibly does NOT contain Variables — the trap is to extrapolate "REST
-gap = capability gap"; the right move is "REST gap → probe Plugin-API
-resolver next").
+**Hard requirement.** Before declaring **any capability gap of the
+loaded MCP-tool surface** in this phase, the LLM MUST execute a
+tool-survey-and-probe. The rule is **structural**: it fires on the
+*meaning* of the sentence (*"does this assert that something the loaded
+tools could in principle reveal is unavailable, partial, or invisible?"*),
+not on literal phrasing. Paraphrases like *"only partial Variable surface"*,
+*"REST cache lacks Variables data"*, *"tokens-MCP path not visible from
+this session"*, or *"color tokens NOT enumerable"* all trigger the rule
+identically.
 
-Canonical content in
+**Trigger-word self-check.** If your draft contains any of `REST`,
+`Variables`, `enumerate`, `enumerable`, `visible`, `missing`, `partial`,
+`accessible`, `available`, `surface` in the context of a token / vocab /
+theming / metadata / a11y claim, run the survey-vs-reframe gate before
+shipping the claim.
+
+This rule applies to ALL runs but is especially load-bearing for
+**auto-mode** (no Phase-6 dialog brake) and on the **T1 path** (REST
+cache file visibly does NOT contain Variables — the trap is to
+extrapolate "REST gap = capability gap"; the right move is "REST gap →
+probe Plugin-API resolver next").
+
+Canonical content (L8.5-generalized) in
 `../../../../shared/cdf-source-discovery/tool-leverage.md` §2 (Rule A
-Enforcement: Tool-Survey BEFORE Resolver-Gap). **`Read` that file**
-before running this step.
+Enforcement: Tool-Survey BEFORE Resolver-Gap). `Read` that file
+**at point-of-need** — before running this step.
 
 **Three-step contract per gap-claim:**
 

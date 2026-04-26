@@ -1,3 +1,10 @@
+---
+phase: 5
+title: Interaction Patterns + A11y Defaults
+requires: []  # 100% LLM synthesis from phase-1-output (utility classification) + phase-3/4-outputs
+read_at: n/a
+---
+
 # Phase 5 · Interaction Patterns + A11y Defaults
 
 **Goal:** Classify each component by the interaction pattern(s) it

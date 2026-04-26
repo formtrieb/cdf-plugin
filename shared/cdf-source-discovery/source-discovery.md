@@ -83,21 +83,56 @@ Before inspecting the Figma file, detect which **Figma-access tier** applies.
 Tier determines how inventory is acquired. Auto-detected from filesystem +
 `.cdf.config.yaml`; User can override.
 
-| Tier | Signal | Inventory path |
+| Tier | Signal (probe-first — see algorithm below) | Inventory path |
 |---|---|---|
-| **T0** (default) | No file cache present | Live `figma_execute` enumeration |
-| **T1** | `scaffold.figma.file_cache_path` exists on disk (e.g. `<dir>/data/library.file.json`) OR `figma-cache/library.file.json` under the DS test-dir | Mechanical walker (`cdf_extract_figma_file({source:"rest"})` MCP tool, or deprecated `scripts/extract-to-yaml.sh` bash) + pluggable resolver |
+| **T0** (last-resort fallback) | T1 modern probe failed with PAT-missing error AND `figma-console` MCP loaded AND Figma Desktop has the file open | Live `figma_execute` enumeration |
+| **T1** | EITHER legacy on-disk cache present (`scaffold.figma.file_cache_path`, `<dir>/data/library.file.json`, or `figma-cache/library.file.json`) OR `cdf_fetch_figma_file({file_key})` succeeds (modern cache-hit OR fresh REST fetch with `FIGMA_PAT` set) | Mechanical walker (`cdf_extract_figma_file({source:"rest"})` MCP tool, or deprecated `scripts/extract-to-yaml.sh` bash) + pluggable resolver |
 | **T2** | T1 signal + `scaffold.token_source.regime: enterprise-rest` + sidecar present | Same as T1, but resolver uses REST `/variables` endpoint |
 
-**Detection algorithm** (run before any inventory work):
+**Detection algorithm** (probe-first — run before any inventory work):
 
-1. Check `scaffold.figma.file_cache_path` in `.cdf.config.yaml`. If set and
-   file exists → T1.
-2. Check `<ds-test-dir>/data/library.file.json` (common fetch default). If
-   exists → T1.
-3. Check `<ds-test-dir>/figma-cache/library.file.json`. If exists → T1.
-4. Else → T0.
-5. If T1 and `scaffold.token_source.regime == enterprise-rest` → T2.
+The algorithm probes capabilities in order; do **NOT** short-circuit to T0
+just because no on-disk cache is found. The trap is mistaking *"no legacy
+cache"* for *"T1 unreachable"* — if `FIGMA_PAT` is set, T1 fetches in ~3 s,
+so falling to T0 unnecessarily costs 30–45 min of `figma_execute` enumeration
+on a mature DS (worked example from a real-world debug session against a
+mid-size DS: 81 pages × 152 component sets × 1615 component instances —
+T0 via WebSocket bridge breaks the 5–10 min Snapshot budget; T1 via REST
++ walker would have resolved in seconds).
+
+1. **T2 enterprise-REST** — if
+   `.cdf.config.yaml.scaffold.token_source.regime == "enterprise-rest"` → T2.
+2. **T1 legacy on-disk cache** — if any of these legacy paths exist (used by
+   the deprecated `scripts/extract-to-yaml.sh` bash pipeline):
+     - `.cdf.config.yaml.scaffold.figma.file_cache_path` (config-pointed)
+     - `<ds-test-dir>/data/library.file.json` (common fetch default)
+     - `<ds-test-dir>/figma-cache/library.file.json`
+   → T1 from legacy cache.
+3. **T1 modern probe** — call `cdf_fetch_figma_file({file_key})` (no PAT
+   arg). The tool internally checks the modern cache at
+   `<ds-root>/.cdf-cache/figma/<file_key>.json` first, then attempts a
+   fresh REST fetch if cache is absent. Outcomes:
+     - **success** (cache-hit OR fresh fetch) → T1.
+     - **`isError: true` with text starting *"FIGMA_PAT not set"*** →
+       PAT is missing, T1-modern is unreachable. Continue to step 4.
+     - **`isError: true` with 4xx / 5xx / network-failure** → halt with
+       diagnostic and ask the user (PAT may be invalid, file_key may be
+       wrong, or the network is unreachable). Do NOT silently fall to T0
+       — the right move is to fix the failing condition.
+4. **T0 runtime** — if `figma-console` MCP is loaded **AND** Figma Desktop
+   has the target file open → T0 (figma_execute / Plugin-API enumeration).
+5. **No tier reachable** — halt with diagnostic listing what was tried and
+   what would unblock T1 (set `FIGMA_PAT`) or T0 (load `figma-console`
+   MCP + open file in Desktop).
+
+**Why probe-first.** Legacy disk-cache absence is mechanically verifiable but
+*not* equivalent to T1-unreachability: a fresh DS clone has no legacy cache,
+but T1 is one `cdf_fetch_figma_file` call away if `FIGMA_PAT` is set. The
+probe (step 3) is a 1-call commit (~3 s wall-time on cache-miss; instant on
+cache-hit) and produces a definitive answer. This matches the `tool-leverage.md`
+**Rule B — Capability-Probe Before Default-Fallback** discipline (sister to
+Rule A "Survey First"). See `tool-leverage.md` §3 for the canonical Rule B
+contract and the worked example.
 
 **T0 is fully backwards-compatible** — existing workflows continue unchanged.
 Users who want T1 run `cdf_fetch_figma_file({file_key, pat?})` once

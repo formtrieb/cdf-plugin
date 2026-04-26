@@ -1,3 +1,13 @@
+---
+phase: 1
+title: Orient
+requires:
+  - shared/cdf-source-discovery/source-discovery.md  # §3 token regime, §4 parent profile, §5 identifier short-code, §6 cache layout
+  - shared/cdf-source-discovery/walker-invocation.md # T1/T2 path: §1 source-of-truth, §2 walker run, §3 resolver, §4 mechanical seeds
+  - shared/cdf-source-discovery/tool-leverage.md     # §1 Rule A point-of-need (first source inspection), §3 Rule B sister-rule (tier-decision), §4 tool-leverage map
+read_at: per-step (point-of-need; not all upfront)
+---
+
 # Phase 1 · Orient
 
 **Goal:** Build a map of the DS — what components, what libraries, what
@@ -422,13 +432,17 @@ The `scaffold:` block in `.cdf.config.yaml` is updated with
 
 ## 3 · Tool-leverage Map (Phase-1 specific)
 
-Canonical content in `../../../../shared/cdf-source-discovery/tool-leverage.md` §3
+Canonical content in `../../../../shared/cdf-source-discovery/tool-leverage.md` §4
 — **`Read` that file** for the full leverage table (`use_figma` ★★★,
 `get_variable_defs` ★★, DS-specific tokens MCP ★★★, `get_design_context` ★,
-`get_metadata` ✗, `get_libraries` ✗, `whoami` ✗, `Read` on DTCG ★). The
-new §2 (Rule-A Enforcement: Tool-Survey Before Resolver-Gap) is also
-load-bearing for Phase-3 token-grammar work — see `phase-3-grammars.md`
-for the cross-reference.
+`get_metadata` ✗, `get_libraries` ✗, `whoami` ✗, `Read` on DTCG ★). §2
+(Rule-A Enforcement: Tool-Survey BEFORE Resolver-Gap) is load-bearing
+for Phase-3 token-grammar work — see `phase-3-grammars.md` for the
+cross-reference. §3 (**Rule B — Capability-Probe Before Default-Fallback**,
+sister-rule to Rule A) is load-bearing for tier-detection at Phase-0.5
+and applies any time the workflow chooses between a default-fallback path
+and a faster preferred-but-conditional path. Both Rule A and Rule B fire
+without a User-dialog brake in auto-mode and Snapshot.
 
 ---
 

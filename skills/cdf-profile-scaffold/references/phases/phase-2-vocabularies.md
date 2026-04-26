@@ -1,3 +1,10 @@
+---
+phase: 2
+title: Extract Vocabularies
+requires: []  # synthesizes from phase-1-output.yaml in-place; no direct shared-doc reads
+read_at: n/a
+---
+
 # Phase 2 · Extract Vocabularies
 
 **Goal:** Aggregate variant-axes across all components into system-level

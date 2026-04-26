@@ -11,6 +11,173 @@ and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 
 ---
 
+## 1.0.4 — 2026-04-27
+
+Snapshot stability bundle: 8 fixes (5 mechanical + 3 inhaltliche) from
+two real-world Snapshot validation runs. Skill-content + plugin-manifest
+only release; no `@formtrieb/cdf-core` / `@formtrieb/cdf-mcp` version
+bumps.
+
+### Fixed — tier-detection probe-order bug (HIGH, F6)
+
+Snapshot/scaffold no longer silently defaults to T0 (slow runtime path)
+when on-disk Figma caches are absent but `FIGMA_PAT` is set. The
+detection algorithm in `shared/cdf-source-discovery/source-discovery.md`
+§2 now follows a probe-first order:
+
+1. T2 (enterprise-REST regime)
+2. T1-legacy-cache (deprecated `extract-to-yaml.sh` paths)
+3. T1-modern-probe via `cdf_fetch_figma_file({file_key})`
+4. T0 (figma_execute runtime, if `figma-console` MCP + Desktop file open)
+5. Halt with diagnostic
+
+The trap was mistaking *"no legacy cache on disk"* for *"T1
+unreachable"* — when in fact `FIGMA_PAT` may be set and a single
+`cdf_fetch_figma_file` call would resolve T1 in ~3 s. On a mature DS
+(~150 component sets × ~1600 component instances), unnecessary T0
+fallback costs 30–45 min of `figma_execute` enumeration via the
+WebSocket bridge and breaks the 5–10 min Snapshot budget.
+
+Adds **Rule B — Capability-Probe Before Default-Fallback** as
+sister-rule to Rule A in `tool-leverage.md` §3, with 3-step contract
+(declare candidate tiers → probe → record outcome) and explicit
+sequencing rule (probe BEFORE decide, NOT in parallel).
+
+### Improved — pre-reading lazy-load (F1, β-strict)
+
+Both SKILL.md §1 redesigned. Snapshot now uses a 4-step dispatch table
+(point-of-need Reads, no upfront eager-load of 3 shared/-refs).
+Scaffold §1.3 / §1.4 / §1.4-bis softened from "Read before Phase 1
+fires" to "Read at point-of-need". All 7 Scaffold phase-docs +
+Snapshot synthesis.md gain `requires:` YAML frontmatter for
+grep-verification.
+
+Result: per-step Read budget at first source inspection drops from 3
+(eager) to 0–2 (point-of-need).
+
+### Improved — Rule-A literal-loophole closed (L8.5)
+
+`tool-leverage.md` §2 Rule-A enforcement was firing only on literal
+phrases like *"X NOT enumerable / NOT visible / NOT accessible"*.
+Paraphrases (*"only partial Variable surface"*, *"REST cache lacks
+Variables data"*, *"tokens-MCP path not visible from this session"*)
+bypassed the literal filter.
+
+The rule is now **structural**: it fires on the meaning of the
+sentence (*"does this assert that a capability of a loaded tool is
+unavailable, partial, or invisible?"*), regardless of wording. A
+positive-obligation trigger-word list (`REST`, `Variables`,
+`enumerate`, `visible`, `missing`, `partial`, `accessible`,
+`available`, `surface`, `enumerable`) provides a self-check signal.
+Mirrored in `synthesis.md` Contract 3-bis,
+`phase-3-grammars.md` Step 3.1.0, and the
+`snapshot.profile.schema.yaml` `blind_spots[]` description.
+
+### Improved — host-tool prerequisites declared explicitly (F8)
+
+Both SKILL.md §0 list a one-time-install host-tool table: `yq`
+(mikefarah ≥ 4.x), `jq`, `python3` (stdlib only — no PyYAML),
+bash 4+/zsh. The toolchain is **PyYAML-frei**: YAML→JSON conversion
+goes through `yq`, not Python.
+
+A new `plugin/scripts/check-host-deps.sh` verifies the environment
+in one shot: returns 0 + resolved versions on success, or 1 +
+`MISSING:<tool>` + install hint on first absent dependency.
+Distinguishes mikefarah's Go `yq` from kislyuk's Python `yq` wrapper
+(only the former is compatible with the inline-jq recipes).
+
+### Improved — deferred-tool note (F4)
+
+`tool-leverage.md` §1 documents the Claude Code deferred-tool surface:
+MCP-provided tools require a one-time `ToolSearch select:tool_name`
+round-trip per tool-family per session. Subsequent calls to the same
+family are free. Includes batching hint
+(`select:tool_a,tool_b,tool_c` pre-loads multiple schemas in one
+round-trip).
+
+### Improved — vocabulary-threshold loosened (F10, inhaltliche)
+
+`synthesis.md` §2.5 vocab-detection rule loosened from strict ≥ 2-sets
+to a tiered policy:
+
+- **Default:** ≥ 2 sets sharing overlapping value-set → vocabulary
+- **Single-set promotion:** ≥ 1 set IF (a) canonical name (`intent`,
+  `density`, `progress`, `orientation`, `position`) OR (b) closed
+  enum with ≥ 3 distinct named values
+- **Boolean-shape promotion:** `[true, false]` VARIANT recurring on
+  ≥ 3 sets surfaces as BOTH `vocabularies.<name>` AND
+  `interaction_a11y.patterns.<verb>`
+- **Icon-Set heuristic:** `name` VARIANT on ≥ 10 sets with
+  single-icon-name shape → ONE icon-name vocabulary across the family
+
+Worked-example block (good vs bad pairs) added for `intent` and
+`selected`. Risk note: when in doubt, default to surfacing-as-finding
+— the LLM's "confidence" is the quality control.
+
+The rule is an **LLM-policy bridge** to be replaced in v1.8.0 by a
+deterministic-code synthesis primitive (`cdf_analyze_inventory`).
+
+### Improved — token-grammar fallback-path depth (F11, inhaltliche)
+
+Contract 4 in `synthesis.md` clarified: the 1× `browse_tokens` cap
+binds the **DS-MCP path only**. In the **filesystem-walk fallback
+path** (no DS-tokens MCP loaded, but DTCG / Tokens-Studio JSON files
+on disk), path-level enumeration is **encouraged, not budget-bound**.
+Per-leaf enumeration remains best-effort; depth-2 cap prevents
+unbounded traversal.
+
+`tool-leverage.md` §4.1 ("Token enumeration paths") adds:
+
+- 3-tier precedence list: DS-MCP loaded > cdf-mcp `tokenTree` loaded
+  > filesystem-walk fallback
+- `jq paths` recipe (depth-2 cap) for surfacing top-level 2-segment
+  dotted prefixes from DTCG files as grammar-candidate seeds, plus a
+  drill-down recipe for one specific prefix
+- Components/* heuristic — recognize per-component-override
+  token-set layouts as a separate `Components` token_layer
+- v1.8.0 sunset note pointing to the queued generic
+  `@formtrieb/tokens-mcp@2.0.0` that supersedes the recipe
+
+### Improved — T0/T1 walker inventory-counting documented (F12, inhaltliche)
+
+T0 (`figma_execute` runtime) and T1 (REST + walker) emit different
+inventory metrics for the same Figma file: T0's `componentsTotal`
+counts every variant-instance; T1's `component_count` dedupes by
+COMPONENT id. On the same file these can differ by 5–10× (e.g.
+T0 = 1615 vs T1 = 191 on a real-world mid-size DS).
+
+`walker-invocation.md` adds an *"Inventory-counting semantic
+difference (T0 vs T1)"* §-block with the metric table and worked
+example. `synthesis.md` §2.2 inventory section gains an *"if both
+ran, emit a one-line note"* instruction.
+
+### Deferred to v1.8.0 (companion roadmap)
+
+- Walker `summary_only` mode (`cdf_extract_figma_file` option)
+- Generic `@formtrieb/tokens-mcp@2.0.0` (path-parameter,
+  non-DS-specific) — supersedes the F11 jq-paths fallback recipe
+- `libraries.linked` walker output bug fix
+- Bash-script deletion (`scripts/extract-to-yaml.sh` retirement)
+- Synthesis-as-Code (`cdf_analyze_inventory`) replacing the F10
+  LLM-policy bridge in `synthesis.md` §2.5
+
+### No package version bumps in v1.0.4
+
+- `@formtrieb/cdf-core@1.0.x` and `@formtrieb/cdf-mcp@1.7.x` unchanged
+- `.mcp.json` still pins `@formtrieb/cdf-mcp@^1.7.2`
+- Skill-content + plugin-manifest only release
+
+### Upgrade for existing installs
+
+```bash
+claude plugin marketplace update cdf
+claude plugin update cdf@cdf
+# Fully quit Claude Code (Cmd+Q) and relaunch — closing the window
+# is not enough; the MCP launcher needs to reload .mcp.json env.
+```
+
+---
+
 ## 1.0.3 — 2026-04-26
 
 ### Fixed — `FIGMA_PAT` not reaching the MCP server from the user's shell

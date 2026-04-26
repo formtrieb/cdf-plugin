@@ -40,6 +40,32 @@ formtrieb/cdf-plugin`.
   Snapshot deliverables (`<ds>.snapshot.profile.yaml` +
   `<ds>.snapshot.findings.md`)
 
+**Host-tool prerequisites (one-time install, not per-run):**
+
+The synthesis pass uses standard POSIX shell utilities for YAML/JSON
+extraction. The toolchain is **PyYAML-frei** — Python is used only with
+its stdlib; YAML→JSON conversion goes through `yq`. A typical macOS
+install: `brew install yq jq`. On Debian/Ubuntu: `apt install yq jq
+python3`. (`yq` must be the **mikefarah** variant — Go-based, ≥ 4.x. The
+older `kislyuk/yq` Python wrapper is NOT compatible with the recipes in
+this skill.)
+
+| Tool | Min version | Install hint |
+|---|---|---|
+| `yq` (mikefarah) | ≥ 4.x | `brew install yq` / `apt install yq` |
+| `jq` | any modern | `brew install jq` / `apt install jq` |
+| `python3` | stdlib only — no PyYAML needed | usually pre-installed; `brew install python3` if not |
+| Bash 4+ or zsh | any modern | macOS 11+/Linux: pre-installed |
+
+To verify your environment in one shot:
+
+```bash
+bash <plugin-root>/scripts/check-host-deps.sh
+```
+
+The script returns 0 + prints the resolved versions on success, or 1 +
+prints `MISSING: <tool>` on the first absent dependency.
+
 **Path-specific prerequisites** (see §1.4 audience-fit for selection):
 
 | Path | What you need |
@@ -61,24 +87,27 @@ session to re-discover plugin components.
 
 ---
 
-## §1 · Opening — Source-Discovery Setup
+## §1 · Orchestration — Point-of-Need Reads (β-strict)
+
+The Snapshot is single-pass with four steps. Each step Reads the shared
+references it needs **immediately before invoking** — do NOT pre-load the
+shared docs upfront. Per-step Read budget is 0–2 files, not 3-upfront.
+
+| Step | What | Read before this step |
+|---|---|---|
+| 1 | Source-discovery + tier-detection + opening checklist | `../../shared/cdf-source-discovery/source-discovery.md` (opening checklist §1, F6-corrected probe-first tier-detection §2, parent-Profile §4, identifier §5, `.cdf-cache/` layout §6) |
+| 2 | Walker invocation (T1/T2) or T0 capture | `../../shared/cdf-source-discovery/walker-invocation.md` (walker invocation §2, source-of-truth contract §1, resolver §3, mechanical seeds §4) |
+| 3 | Single-pass synthesis | `references/synthesis.md` (six contracts + per-section guidance) **and** `../../shared/cdf-source-discovery/tool-leverage.md` (Rule A enforcement §2 — gates blind_spots; Rule B §3 if any tier-decision still pending; Token enumeration paths §-block under §4 — Contract 4 fallback recipes) |
+| 4 | Render | (no shared/-deps; one MCP tool call to `cdf_render_snapshot`) |
+
+`references/synthesis.md` declares its own `requires:` deps in YAML
+frontmatter so this dispatch is grep-verifiable. If you arrive at a step
+without having Read its required docs, Read them now before continuing —
+**point-of-need is the contract; skipping is not**.
 
 The Snapshot consumes the same source-discovery layer as the Production
-Scaffold; one canonical doc, both skills load it.
-
-**Read these shared references in order before any source inspection:**
-
-1. `Read` `../../shared/cdf-source-discovery/source-discovery.md`
-   — opening checklist (DS name + Figma URL + token regime), tier
-   detection (T0/T1/T2), parent-Profile inheritance, identifier short-
-   code, and `.cdf-cache/` output layout.
-2. `Read` `../../shared/cdf-source-discovery/tool-leverage.md`
-   — Survey-First (Rule A), tool-leverage map (figma-mcp + DS-specific
-   tokens MCP), truncation-awareness, documentation-surfaces triage.
-3. `Read` `../../shared/cdf-source-discovery/walker-invocation.md`
-   — Walker invocation in either source-mode (REST/T1 or runtime/T0),
-   source-of-truth contract (do NOT re-read Figma to "confirm" walker
-   output), mechanical seeded-findings.
+Scaffold; the shared docs are one canonical source, both skills load them
+on-demand.
 
 ### §1.4 · Audience-fit — choose your source-path
 

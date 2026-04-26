@@ -1,3 +1,10 @@
+---
+phase: 7
+title: Emit + Validate
+requires: []  # uses Write + cdf_validate_profile MCP + cdf_coverage MCP; no shared-doc reads
+read_at: n/a
+---
+
 # Phase 7 · Emit + Validate
 
 **Goal:** Materialize the Profile YAML from the accumulated Phase 1–6
@@ -284,7 +291,7 @@ Per-pair templates live in §6.4-ter; Phase-7 only emits the table.
 - Phase-2 hook:    `references/phases/phase-2-vocabularies.md` §2.9.6
 - Phase-6 dialog:  `references/phases/phase-6-findings-classify.md` §6.4-ter
 - Plan: `docs/plans/done/2026-04-24-lever-2a-vocab-near-miss-lint.md`
-- Empirical seed: `docs/plans/active/2026-04-25-bug-check-results.md`
+- Empirical seed: `docs/plans/done/2026-04-25-bug-check-results.md`
   §"L2A vocab-near-miss-lint — empirical seed table"
 
 #### Step 7.1.1 — Emit when `extends:` is set (merge-aware omission)

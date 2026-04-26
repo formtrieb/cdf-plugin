@@ -1,3 +1,10 @@
+---
+phase: 6
+title: Findings + Classify
+requires: []  # aggregates seeded_findings[] from phase-1..5 outputs; uses templates and AskUserQuestion
+read_at: n/a
+---
+
 # Phase 6 · Findings + Classify
 
 **Goal:** Collate every finding seeded across Phases 1–5 into a single

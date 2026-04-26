@@ -1,7 +1,18 @@
+---
+title: Snapshot Synthesis — Single-Pass Prompt
+loaded_by: skills/cdf-profile-snapshot/SKILL.md §1 step-3
+read_at: step-3 (synthesis dispatch — point-of-need)
+requires:
+  - shared/cdf-source-discovery/walker-invocation.md  # §1 source-of-truth contract; T0/T1 inventory semantics
+  - shared/cdf-source-discovery/tool-leverage.md      # §2 Rule A enforcement (Contract 3-bis); §4 Token enumeration paths block (Contract 4 fallback)
+# source-discovery.md is upstream (Read at SKILL.md §1 step-1) — not re-declared here
+---
+
 # Snapshot Synthesis — Single-Pass Prompt
 
-**Loaded by:** `../SKILL.md` §2 (the cdf-profile-snapshot SKILL.md) after
-source-discovery resolves and the walker artefact is on disk.
+**Loaded by:** `../SKILL.md` §1 step-3 (the cdf-profile-snapshot SKILL.md
+orchestration table) after source-discovery resolves and the walker artefact
+is on disk.
 
 **Output target:** `<ds>.snapshot.profile.yaml` conforming to
 `references/snapshot.profile.schema.yaml`, plus the inputs the renderer
@@ -130,10 +141,50 @@ enumerable." That extrapolation is a Rule-A violation. See
 `../../../shared/cdf-source-discovery/tool-leverage.md` §2 (Rule A
 Enforcement: Tool-Survey BEFORE Resolver-Gap) for the canonical rule.
 
-**Hard rule for Snapshot.** Any blind_spot entry that asserts a
-**resolver-gap** of the shape *"X NOT enumerable / NOT visible / NOT
-accessible / NOT available"* MUST carry a `tool_survey:` sub-field
-listing:
+The §2 rule is **structural** (L8.5): it fires on the *meaning* of the
+sentence — *"does this assert that a capability of a loaded tool is
+unavailable, partial, or invisible?"* — not on literal phrases. Paraphrases
+like *"only partial Variable surface"*, *"REST cache lacks Variables
+data"*, or *"tokens-MCP path not visible from this session"* trigger the
+rule the same way *"NOT enumerable"* does. The positive-obligation trigger-
+word list (`REST`, `Variables`, `enumerate`, `visible`, `missing`,
+`partial`, `accessible`, `available`, `surface`, `enumerable`) is a
+self-check heuristic — when any of these appear in a token/vocab/
+theming-axis/metadata claim sentence, run the survey-vs-reframe gate.
+
+`tool-leverage.md` §3 (**Rule B — Capability-Probe Before Default-Fallback**)
+is the sister-rule covering the upstream tier-decision in
+`source-discovery.md` §2: choosing T0 over T1 because no on-disk cache
+is visible, when a `cdf_fetch_figma_file({file_key})` probe would have
+shown T1 is reachable, is the same family of failure as declaring "X
+NOT enumerable" without surveying loaded MCP tools. Rule B operates at
+the path-selection layer; Rule A operates at the gap-declaration layer.
+Snapshot synthesis runs *after* tier-selection has resolved, so
+Contract 3-bis enforcement here scopes to Rule A; Rule B governs the
+upstream walker-invocation step. Both apply in auto-mode and Snapshot.
+
+**Hard rule for Snapshot (L8.5-generalized).** Any blind_spot entry that
+asserts a **capability gap of the loaded MCP-tool surface** MUST carry a
+`tool_survey:` sub-field listing the loaded `mcp__*` tools and the result
+of probing AT LEAST ONE on a representative target. The structural test:
+*"is this sentence claiming that something the loaded tools could in
+principle reveal is unavailable, partial, or invisible?"* — if yes,
+tool_survey is required regardless of the exact wording.
+
+Paraphrased forms equally trigger the rule (non-exhaustive):
+
+- *"X NOT enumerable / NOT visible / NOT accessible / NOT available"*
+- *"only partial X surface"*
+- *"REST cache lacks X data"*
+- *"X path not visible from this session"*
+- *"tokens-MCP not loaded so X is missing"*
+
+Trigger-word self-check: if the sentence contains `REST`, `Variables`,
+`enumerate`, `visible`, `missing`, `partial`, `accessible`, `available`,
+`surface`, or `enumerable` in the context of a token / vocab / theming /
+metadata / a11y claim, run the survey-vs-reframe gate before accepting it.
+
+The `tool_survey:` sub-field lists:
 
 - The loaded `mcp__*` tools that conceivably address this resource.
 - The result of probing AT LEAST ONE of them on a representative target.
@@ -209,31 +260,56 @@ The `tool_survey:` sub-field shape is part of the Snapshot output
 schema for any gap-style blind_spot. Boilerplate gap claims without
 this sub-field are Contract 3 violations.
 
-### Contract 4 — TOKEN-MCP: one `browse_tokens` call MAX
+### Contract 4 — TOKEN-MCP: one `browse_tokens` call MAX (DS-MCP path only)
 
-If a DS-tokens MCP is available (`scaffold.resolver.mcp_name` set, or
-detected at run time), you MAY make ONE `browse_tokens` call to inform
-`token_grammar` + `inventory.tokens.total_tokens`. ONE.
+**Path applicability (F11-clarified).** Contract 4 binds the **DS-tokens-MCP
+path** specifically — when a DS-specific tokens MCP is loaded
+(`scaffold.resolver.mcp_name` set, or detected at run time, or
+`mcp__<ds>-tokens__browse_tokens` visible in tool surface). On that path,
+you MAY make ONE `browse_tokens` call to inform `token_grammar:` +
+`inventory.tokens.total_tokens`. **ONE.**
 
-Forbidden:
+In the **filesystem-walk fallback path** (no DS-tokens MCP loaded, but
+DTCG/Tokens-Studio JSON files exist on disk), path-level enumeration is
+**encouraged, not budget-bound** — emit at minimum set-level + top-level
+2-segment-prefix grammar. The fallback path uses a different tool surface
+(`jq paths` over DTCG files, depth-capped) — it is governed by the
+"Token enumeration paths" §-block in
+`../../../shared/cdf-source-discovery/tool-leverage.md` (under §4),
+NOT by Contract 4's `browse_tokens` cap. Per-leaf enumeration remains
+best-effort even in the fallback path; depth-2 is the recommended cap to
+prevent unbounded `jq paths` traversal on giant token-trees.
 
-- Multi-call analysis loops ("let me check `color.*` then `dimension.*`
-  separately"). That is Production-Scaffold Phase-3 territory.
+Forbidden on the DS-MCP path:
+
+- Multi-call `browse_tokens` analysis loops ("let me check `color.*` then
+  `dimension.*` separately"). That is Production-Scaffold Phase-3
+  territory.
 - Calling `resolve_token` per leaf to confirm values.
 - Calling `compose_theme` / `find_placeholders` / `check_design_rules`
   / `compare_themes` — these are audit tools, not Snapshot tools.
 
-Single call shape: `browse_tokens` with the broadest practical depth
-(`depth=2` typical) over the root namespace. Paste the result into
-prose-form summary inside `token_grammar:` entries' `evidence_path` +
-`inventory.tokens.note`. Do NOT round-trip the call results into
-multiple `token_grammar` entries that imply per-leaf inspection
-happened — it didn't.
+Single call shape (DS-MCP path): `browse_tokens` with the broadest
+practical depth (`depth=2` typical) over the root namespace. Paste the
+result into prose-form summary inside `token_grammar:` entries'
+`evidence_path` + `inventory.tokens.note`. Do NOT round-trip the call
+results into multiple `token_grammar` entries that imply per-leaf
+inspection happened — it didn't.
 
-If no token-MCP is available, set `inventory.tokens.enumeration_method:
-walker_only` (or `none`) and emit `token_grammar:` only when grammars
-are inferable from token PATHS visible in `phase-1-output.yaml`. Add a
-blind-spot naming the missing token-MCP.
+If no token-MCP is available **and** no DTCG files are on disk, set
+`inventory.tokens.enumeration_method: walker_only` (or `none`) and emit
+`token_grammar:` only when grammars are inferable from token PATHS
+visible in `phase-1-output.yaml`. Add a blind-spot naming the missing
+token surface.
+
+**Components/* heuristic.** If `tokens/Components/<Name>.json` (or
+similar `tokens/<Component-or-Override>/`) sets exist, read content
+**even if budget-tight** and emit a separate `Components`-style
+token_layer entry — this is structural signal about the DS's
+token-cascade architecture, not detail-noise. The Production-Scaffold
+reference Profile typically surfaces Components as a `token_layer` with
+`always_enabled: true`; Snapshot can flag the layer's presence in
+~30 s with `ls tokens/Components/*.json | wc -l` + per-file leaf-count.
 
 ### Contract 5 — FINDINGS: max 15, flag-only, no decision-vocab
 
@@ -340,6 +416,18 @@ Citation rule: every numeric value here MUST trace to a walker field
 of the same name. The schema annotates each as `[walker]` for exactly
 this reason — copy, don't compute.
 
+**T0/T1 inventory-semantic note (F12).** If both T0 (runtime walker) and
+T1 (REST walker) artefacts are available — e.g. tier-detection ran a
+probe before falling to T0, and both produced data — emit a one-line
+note in `inventory:` explaining which metric was used and why. T0
+counts every variant-instance (`componentsTotal` field), T1 dedupes by
+COMPONENT id (`component_count` field); on the same file these can
+differ by 5–10× (e.g. T0 = 1615 vs T1 = 191 on a real-world mid-size DS).
+Prefer T1's deduped counts when both are available. The semantic detail
+lives in `../../../shared/cdf-source-discovery/walker-invocation.md`
+(Inventory-counting semantic difference T0 vs T1) — cite that section
+in the note. If only one tier ran (the typical case), no note is needed.
+
 ### 2.3 — `blind_spots` (REQUIRED · HIGH trust · LLM-targeted)
 
 The trust handshake. See Contract 3 above. Use the seven
@@ -385,14 +473,99 @@ Source: variantOptions across
 detected vocabulary becomes one entry (name + description + values +
 evidence_path).
 
-Detection heuristic: variant property names that recur across multiple
-component sets with overlapping value-sets are vocabulary candidates
-(e.g. `Hierarchy: [primary, secondary]` showing up on Button + Tag +
-TextField). One-off variant property names that appear on a single
-component set are component-local and NOT vocabularies — surface them
-as findings instead if salient.
+#### Detection threshold (F10-loosened — bridge to v1.8.0 `analyzeInventory()`)
 
-Citation rule: every vocabulary's `values:` list traces to specific
+The pre-F10 threshold (≥2 sets sharing overlapping value-set) lost signal
+on messy real-world DSes — single-set DS-wide concepts (`intent`,
+`density`, `progress`, `orientation`, `range-position`) were demoted to
+findings, halving the vocab-count vs the Production-Scaffold reference.
+The new threshold:
+
+```
+Default rule:           ≥2 sets sharing overlapping value-set → vocabulary
+Single-set promotion:   ≥1 set IF the value-set is semantically self-evident
+                        as a DS-wide concept. Two qualifying signals (either
+                        is sufficient):
+                        (a) canonical names — the property name is one of
+                            `intent`, `density`, `progress`, `orientation`,
+                            `position`, or close lexical variants — these
+                            are DS-architecture primitives that recur across
+                            DSes regardless of single-instance count
+                        (b) closed-enum shape — value-set has ≥3 distinct
+                            named values forming a closed enumeration with
+                            non-generic semantic names (e.g. `[completed,
+                            current, upcoming]` qualifies; `[s, m, l]`
+                            does not — names are too generic to confirm
+                            DS-wide concept)
+Boolean-shape promotion: VARIANT properties with `[true, false]` value-set
+                        recurring on ≥3 sets surface as TWO entries:
+                        (i)  top-level `vocabularies.<name>` entry
+                        (ii) `interaction_a11y.patterns.<verb>` entry
+                        E.g. `selected` (8 sets) → BOTH `vocabularies.selected`
+                        AND `patterns.selection`. The vocabulary surfaces
+                        the concept; the pattern surfaces the interaction
+                        contract. Both views are signal.
+Icon-Set heuristic:     If a `name` (or `icon-name`, `Icon`) VARIANT
+                        property recurs on ≥10 sets with single-icon-name
+                        value-shape (one icon name per variant; values
+                        like `chevron-down`, `arrow-right`), elevate as
+                        ONE icon-name vocabulary across the family —
+                        not N separate findings. The full name-set is
+                        the union of all 10+ sets' values.
+```
+
+#### Worked examples (good vs bad)
+
+❌ **BAD — pre-F10 strict reading**:
+
+```yaml
+vocabularies:
+  hierarchy:        # 4 sets — qualifies under default rule
+    values: [primary, secondary, tertiary]
+findings:
+  - topic: "Status Chip has single-set `intent` axis"
+    observation: "Status Chip declares intent variant [error, info, neutral, success, warning] but no other component shares it"
+```
+
+✅ **GOOD — F10-loosened reading**:
+
+```yaml
+vocabularies:
+  hierarchy:                              # default rule (≥2 sets)
+    values: [primary, secondary, tertiary]
+  intent:                                 # single-set promotion (a) — canonical name
+    values: [error, info, neutral, success, warning]
+    evidence_path: ds_inventory.component_sets.entries[<i>].propertyDefinitions.intent.variantOptions
+    note: "Single-set canonical concept; mirrors token-grammar `color.system-status.{intent}.*`"
+  selected:                               # boolean-shape promotion (8 sets)
+    values: [true, false]
+    evidence_path: <8 sets where `selected` recurs>
+    note: "Also surfaced as interaction_a11y.patterns.selection"
+interaction_a11y:
+  patterns:
+    selection:                            # paired with vocabularies.selected
+      states: [unselected, selected]
+      evidence_path: <same 8 sets>
+```
+
+The reframed view: `intent` was a vocab-with-token-mirror missed; `selected`
+was a vocab-and-pattern dual-view missed. Both are signal under F10.
+
+#### Risk note — when in doubt, surface-as-finding
+
+These promotion rules apply when the LLM can **confidently identify** the
+semantic concept. If unsure (the value-set is ambiguous, the property name
+is generic like `state` or `style`, the values are mostly numbers), default
+to surfacing-as-finding — Production Scaffold Phase-2 isolation pass will
+promote it later if appropriate. Snapshot's promotion rules are
+**high-recall** by design, but the LLM's "confidence" gate is the
+quality control. R6 mitigation: if Snapshot output surfaces obvious junk
+vocabs (e.g. one-off color modifiers, internal property-name leaks),
+the threshold should re-tighten on next iteration.
+
+#### Citation rule (unchanged)
+
+Every vocabulary's `values:` list traces to specific
 `entries[i].propertyDefinitions.<PropName>.variantOptions`. The
 `evidence_path:` field MUST reach down to the variantOptions cell. If
 multiple entries share the same vocabulary, cite the canonical-looking
@@ -401,6 +574,16 @@ one (or the first detected) — do not list all.
 Snapshot OMITS Profile §5 fields per the schema annotation: `aliases`,
 `per_category`, `notes`, `casing`. Surfacing those is Production
 synthesis work.
+
+#### v1.8.0 sunset note
+
+The F10 threshold rules above are an **LLM-policy bridge**. v1.8.0 ships
+`cdf_analyze_inventory` as a deterministic-code synthesis primitive that
+replaces this §2.5 policy with a pure function — see
+`docs/plans/active/2026-04-26-v1.8.0-roadmap.md`. Until then, the LLM
+applies the rules above; their job is to make Snapshot output close enough
+to the v1.8.0 mechanized result that the v1.8.0 swap is a quality
+improvement, not a behavior break.
 
 ### 2.6 — `token_grammar` (OPTIONAL · `_quality: draft`)
 

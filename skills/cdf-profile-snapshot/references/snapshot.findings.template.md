@@ -60,7 +60,7 @@
     {{UPGRADE_PATH}}          — upgrade_path string, prose
 
   Related:
-    - Plan: docs/plans/active/2026-04-25-quick-look-mode.md (QL.A, QL.D)
+    - Plan: docs/plans/done/2026-04-25-quick-look-mode.md (QL.A, QL.D)
     - Schema: snapshot.profile.schema.yaml (sibling)
     - Skill: ../SKILL.md
     - Production analogue (do NOT copy verbatim — different audience):

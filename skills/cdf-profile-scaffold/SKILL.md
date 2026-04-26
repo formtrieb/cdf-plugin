@@ -35,6 +35,32 @@ formtrieb/cdf-plugin`.
 - A target design-system directory with write permissions for
   `.cdf-cache/` and the canonical deliverables
 
+**Host-tool prerequisites (one-time install, not per-run):**
+
+The Phase 2/3/7 emit pipelines use standard POSIX shell utilities for
+YAML/JSON extraction. The toolchain is **PyYAML-frei** — Python is used
+only with its stdlib; YAML→JSON conversion goes through `yq`. A typical
+macOS install: `brew install yq jq`. On Debian/Ubuntu: `apt install yq
+jq python3`. (`yq` must be the **mikefarah** variant — Go-based, ≥ 4.x.
+The older `kislyuk/yq` Python wrapper is NOT compatible with the
+inline-jq recipes Phase 3 uses.)
+
+| Tool | Min version | Install hint |
+|---|---|---|
+| `yq` (mikefarah) | ≥ 4.x | `brew install yq` / `apt install yq` |
+| `jq` | any modern | `brew install jq` / `apt install jq` |
+| `python3` | stdlib only — no PyYAML needed | usually pre-installed; `brew install python3` if not |
+| Bash 4+ or zsh | any modern | macOS 11+/Linux: pre-installed |
+
+To verify your environment in one shot:
+
+```bash
+bash <plugin-root>/scripts/check-host-deps.sh
+```
+
+The script returns 0 + prints the resolved versions on success, or 1 +
+prints `MISSING: <tool>` on the first absent dependency.
+
 **Path-specific prerequisites** (the skill auto-detects which path
 applies — see §1.4 below; this list is here so you can pre-configure):
 
@@ -101,8 +127,9 @@ digraph resume_flow {
 ### 1.3 Opening Checklist (Phase 1 — three-tier advisor tone)
 
 Canonical content lives in
-`../../shared/cdf-source-discovery/source-discovery.md` §1. **`Read` that
-file** before opening Phase 1 with the User. Covers required (DS name,
+`../../shared/cdf-source-discovery/source-discovery.md` §1. `Read` that
+file **at point-of-need** — when actually initiating the opening dialog
+with the User (not upfront before Phase-0). Covers required (DS name,
 Figma URL), quality-critical (token-source regime, parent-Profile
 inheritance), and nice-to-have inputs in advisor (not gatekeeper) tone.
 
@@ -115,22 +142,29 @@ before every source inspection.
 ### 1.4 Tier Detection (Phase-0.5)
 
 Canonical content lives in
-`../../shared/cdf-source-discovery/source-discovery.md` §2. **`Read` that
-file** before Phase 1 fires. Covers T0 / T1 / T2 detection algorithm,
-backwards-compatibility note, and the pluggable-resolver slot for the
-Variable-ID → path mapping.
+`../../shared/cdf-source-discovery/source-discovery.md` §2. `Read` that
+file **at point-of-need** — when running tier-detection at Phase-0.5.
+Covers the F6-corrected probe-first algorithm (T2 → T1-legacy-cache →
+T1-modern-probe → T0 → halt), backwards-compatibility note, and the
+pluggable-resolver slot for the Variable-ID → path mapping.
 
-Tier detection runs at Phase-0.5 (before Phase 1) and writes
-`scaffold.tier` into `.cdf.config.yaml`. Phase-1's T1/T2 branch consumes
-`scaffold.tier`; Phase-4 (Theming) consumes the resolver output without
-knowing which backend filled it.
+Tier detection writes `scaffold.tier` into `.cdf.config.yaml`. Phase-1's
+T1/T2 branch consumes `scaffold.tier`; Phase-4 (Theming) consumes the
+resolver output without knowing which backend filled it.
+
+The probe-first algorithm enforces the **Rule B — Capability-Probe Before
+Default-Fallback** discipline (`tool-leverage.md` §3): legacy-cache
+absence is not equivalent to T1-unreachability, and silent T0-fallback
+costs 30–45 min of `figma_execute` enumeration per mature DS.
 
 ### 1.4-bis Output Layout — `.cdf-cache/` convention
 
 Canonical content lives in
-`../../shared/cdf-source-discovery/source-discovery.md` §6. **`Read` that
-file** for the cache-vs-canonical-vs-deliverable split, the `mkdir -p`
-contract, and the `.gitignore` recommendation.
+`../../shared/cdf-source-discovery/source-discovery.md` §6. `Read` that
+file **at point-of-need** — when the workflow first writes to
+`.cdf-cache/` (typically end of Phase 1). Covers the
+cache-vs-canonical-vs-deliverable split, the `mkdir -p` contract, and the
+`.gitignore` recommendation.
 
 Scaffold-specific examples for each category:
 - **Cache:** `phase-1-output.yaml` … `phase-5-output.yaml`
@@ -200,12 +234,20 @@ end-to-end. Follow them in every phase.
 ### Rule A · Survey First (sources & tools)
 
 Canonical content lives in
-`../../shared/cdf-source-discovery/tool-leverage.md` §1. **`Read` that
-file** before any source inspection. Covers the three-step discipline
-(ask WHERE → check tools → raw-parse last), the LLM default-trap
-explanation, and the spec-reads-via-`cdf_get_spec_fragment` corollary.
+`../../shared/cdf-source-discovery/tool-leverage.md` §1. `Read` that
+file **at point-of-need** — at first source inspection, not upfront.
+Covers the three-step discipline (ask WHERE → check tools → raw-parse
+last), the LLM default-trap explanation, and the spec-reads-via-
+`cdf_get_spec_fragment` corollary.
 
-Each phase-doc preamble lists the spec fragments relevant to that phase.
+Companion rule: §2 (Rule A Enforcement: Tool-Survey BEFORE Resolver-Gap)
+hard-rules out paraphrased capability-gap claims; §3 (**Rule B —
+Capability-Probe Before Default-Fallback**, sister to Rule A) hard-rules
+out tier-fallbacks that skip the probe. Both are auto-mode-load-bearing.
+
+Each phase-doc preamble lists the spec fragments relevant to that phase
+and declares its `requires:` shared-doc deps in YAML frontmatter for
+grep-verification.
 
 ### Rule B · Truncation-Awareness
 

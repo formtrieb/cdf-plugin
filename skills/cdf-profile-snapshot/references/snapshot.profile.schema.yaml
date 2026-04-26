@@ -105,12 +105,26 @@ blind_spots:                                     # REQUIRED — the trust handsh
   #   target count.
   #
   # Two entry shapes supported (synthesis.md Contract 3-bis):
-  #   (a) Plain string — for non-resolver-gap blind_spots (e.g. "Findings
+  #   (a) Plain string — for non-capability-gap blind_spots (e.g. "Findings
   #       classification status — N findings unclassified").
   #   (b) Object with `claim:` + `tool_survey:` — REQUIRED for any blind_spot
-  #       whose claim asserts a resolver-gap ("X NOT enumerable / NOT visible
-  #       / NOT accessible"). The tool_survey sub-field documents the probe
-  #       executed before the gap was declared (Rule-A enforcement).
+  #       whose claim asserts a CAPABILITY GAP of the loaded MCP-tool
+  #       surface (L8.5-generalized — structural, not literal). Triggers
+  #       on the meaning, not the wording: any sentence claiming that a
+  #       capability of a loaded tool is unavailable, partial, invisible,
+  #       not enumerable, not accessible, or only partial requires a
+  #       tool_survey. Paraphrases ("only partial Variable surface", "REST
+  #       cache lacks Variables data", "tokens-MCP path not visible from
+  #       this session") trigger the rule the same as the literal "X NOT
+  #       enumerable / NOT visible / NOT accessible". The tool_survey
+  #       sub-field documents the probe executed before the gap was
+  #       declared (Rule-A enforcement, L8.5).
+  #
+  #       Trigger-word self-check: if `REST`, `Variables`, `enumerate`,
+  #       `enumerable`, `visible`, `missing`, `partial`, `accessible`,
+  #       `available`, or `surface` appears in the claim text in the
+  #       context of a token / vocab / theming / metadata claim, the entry
+  #       MUST take shape (b), not (a).
   #
   # Plain-string topics if applicable:
   #   • Findings classification status (always blind here)

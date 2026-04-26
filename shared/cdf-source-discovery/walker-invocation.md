@@ -35,11 +35,21 @@ the source.
 
 ## 2 · Run the Walker
 
+**Tier selection happens upstream.** This section assumes T1 or T2 was selected
+by the probe-first algorithm in `source-discovery.md` §2. If you skipped that
+step and arrived here directly because no on-disk cache was visible, **stop**
+and run the upstream algorithm — you may be falling to T0 unnecessarily. The
+Rule B "Capability-Probe Before Default-Fallback" discipline in
+`tool-leverage.md` §3 codifies this: legacy cache absence is not equivalent to
+T1-unreachability, and `cdf_fetch_figma_file({file_key})` is the canonical
+T1-modern probe.
+
 **Canonical path — `cdf-mcp` (≥ v1.7.0):**
 
 ```text
 1. cdf_fetch_figma_file({ file_key: "<your-file-key>" })
    → caches the REST payload at <ds-root>/.cdf-cache/figma/<file_key>.json
+   → also serves as T1-modern probe (see source-discovery.md §2 step 3)
 2. cdf_extract_figma_file({ source: "rest", file_key: "<your-file-key>" })
    → walks + emits <ds-root>/.cdf-cache/phase-1-output.yaml
 ```
@@ -124,6 +134,38 @@ deprecation cleanup).
    leave it off.
 5. Walker phase itself does NOT call AskUserQuestion. Downstream
    finding-classification is per-skill.
+
+---
+
+### Inventory-counting semantic difference (T0 vs T1)
+
+T0 (`figma_execute` runtime, Plugin-API enumeration) and T1 (REST + walker)
+emit **different inventory metrics for the same Figma file**. This is
+by-design but easy to misread:
+
+| Metric | T0 (runtime) | T1 (REST walker) |
+|---|---|---|
+| `componentsTotal` | every COMPONENT instance (variants count individually) | not emitted |
+| `component_count` | not emitted | unique COMPONENTs by id (variants share parent id) |
+| `component_set_count` | every COMPONENT_SET instance | unique COMPONENT_SETs |
+
+Worked example — same Figma file walked under both adapters in a debug
+session: T0 reported `componentsTotal: 1615`, T1 reported
+`component_count: 191`. The real authored COMPONENT count is ~191; T0's
+1615 reflects variant-instance count (each variant inside a
+COMPONENT_SET counts as a separate COMPONENT in the runtime tree, while
+T1 deduplicates by `id`).
+
+**When emitting Snapshot inventory:** prefer T1's deduped counts. If
+both T0 and T1 ran (e.g. probe-then-walker in `source-discovery.md` §2),
+emit a one-line note in `inventory:` explaining which metric was used
+and the underlying reason for the discrepancy. Snapshot synthesis
+(`cdf-profile-snapshot/references/synthesis.md` §2.2) carries the
+operational instruction.
+
+This is a **walker-output-semantic** issue, not a discrepancy between
+adapters — both adapters faithfully report what they see. The reader
+(human or downstream tool) needs the framing to reconcile the numbers.
 
 ---
 
