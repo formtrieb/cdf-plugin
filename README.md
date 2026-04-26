@@ -94,36 +94,64 @@ lose it, regenerate.
 
 ### 2. Provide the PAT to the plugin
 
+> [!IMPORTANT]
+> **A `.env` file in your project dir is NOT auto-loaded** by Claude
+> Code or by the MCP launcher. If you've put `FIGMA_PAT=...` into a
+> `.env` and expected it to "just work" — that's why the first
+> `cdf_fetch_figma_file` call fails. `.env` files only work if you
+> explicitly source them before launching `claude` (see Option C
+> below).
+
 The cdf-mcp tools resolve the PAT in this order:
-**`pat:` arg → `FIGMA_PAT` env var → actionable error message.** Pick
-the delivery method that fits your workflow:
+**`pat:` arg → `FIGMA_PAT` env var → actionable error.** The
+question for you is *where* `FIGMA_PAT` ends up in the env that
+cdf-mcp runs with.
 
-#### Option A — Shell environment variable (engineer-friendly)
+The plugin's bundled `.mcp.json` already declares the passthrough:
 
-Add the PAT to your shell rc so every Claude Code session inherits
-it. macOS / Linux with zsh:
+```json
+{
+  "mcpServers": {
+    "cdf-mcp": {
+      "command": "npx",
+      "args": ["-y", "@formtrieb/cdf-mcp@^1.7.2"],
+      "env": {
+        "FIGMA_PAT": "${FIGMA_PAT}"
+      }
+    }
+  }
+}
+```
+
+`${FIGMA_PAT}` interpolates from the **shell environment that
+launched Claude Code**, not from any `.env` file in your project.
+So the goal of every option below is "make sure `FIGMA_PAT` is in
+the shell env when you run `claude`."
+
+#### Option A — Shell rc (recommended for daily use)
+
+Add the PAT to your shell rc so every new terminal — and every
+Claude Code session launched from it — inherits it.
 
 ```bash
 # ~/.zshrc (or ~/.bashrc for bash)
 export FIGMA_PAT="figd_YOUR_TOKEN_HERE"
 ```
 
-Then either `source ~/.zshrc` in an existing terminal or open a new
-one. **Fully quit Claude Code (Cmd+Q) and relaunch** so the MCP
-launcher picks up the new env. Verify:
+Apply + verify + restart CC:
 
 ```bash
-echo $FIGMA_PAT | cut -c1-5    # Expect: figd_
+source ~/.zshrc                      # apply in current terminal
+echo $FIGMA_PAT | cut -c1-5          # expect: figd_
+# Fully quit Claude Code (Cmd+Q on macOS — closing the window is
+# not enough), then relaunch from a terminal that has the new env.
 ```
 
-This is the path the skills assume by default — when `FIGMA_PAT` is
-set, the scaffold/snapshot skills don't ask about authentication.
+#### Option B — Per-call `pat:` argument (multi-account / one-off)
 
-#### Option B — Per-call `pat:` argument (designer-friendly, multi-account)
-
-If you'd rather not have a long-lived token in your shell rc — for
-example, you work across multiple Figma accounts and want to swap
-tokens per file — pass the PAT as an argument to the MCP tool when
+If you don't want a long-lived token in your shell rc — for example,
+you work across multiple Figma accounts and want a different PAT
+per file — skip the shell-env step and pass the PAT inline when
 invoking the skill. Inside a Claude Code session:
 
 > Run `cdf_fetch_figma_file` against
@@ -131,31 +159,91 @@ invoking the skill. Inside a Claude Code session:
 > `pat: "figd_YOUR_TOKEN_HERE"`.
 
 The skill threads the arg through to the tool call. The arg-form
-**overrides** any `FIGMA_PAT` env var that's set, so you can keep a
-default token in the shell and override it per-run when needed.
+**overrides** any `FIGMA_PAT` env var, so you can keep a default
+token in the shell and override per-run when needed.
 
 #### Option C — `.env` file in the DS dir (project-scoped)
 
-If your design-system repo already uses a `.env` for other secrets,
-add the PAT there and source it before launching Claude Code:
+`.env` files don't auto-load — but they're a clean way to keep one
+PAT per project as long as you remember to source the file before
+launching CC.
 
 ```bash
-# <ds-repo>/.env  (DO NOT commit — make sure .gitignore covers .env)
+# <ds-repo>/.env  (DO NOT commit — add .env to .gitignore)
 FIGMA_PAT=figd_YOUR_TOKEN_HERE
 ```
 
+Launch CC like this every time:
+
 ```bash
 cd <ds-repo>
-set -a && source .env && set +a    # exports each KEY=VALUE
-claude                              # CC inherits FIGMA_PAT
+set -a && source .env && set +a     # exports each KEY=VALUE pair
+claude                                # CC inherits FIGMA_PAT
 ```
 
-This is the same as Option A but scoped to one project — useful when
-you have one PAT per DS.
+`set -a` makes every variable set in the next commands automatically
+exported; `set +a` turns it off again. Without it, `source .env`
+only sets the var inside the current process, not its children.
 
-### 3. Verify
+You can wrap this in a shell function if you launch CC frequently
+from this dir:
 
-Inside a Claude Code session in your DS dir:
+```bash
+# add to ~/.zshrc
+cdf-launch() {
+  ( set -a && source .env && set +a && claude "$@" )
+}
+# usage:  cd <ds-repo> && cdf-launch
+```
+
+#### Option D — Override the plugin's MCP config (project-pinned PAT)
+
+If you want a project-pinned PAT *without* relying on shell env
+sourcing, add a project-level `.mcp.json` with the PAT hardcoded.
+This **overrides** the plugin's `.mcp.json` for this project:
+
+```json
+{
+  "mcpServers": {
+    "cdf-mcp": {
+      "command": "npx",
+      "args": ["-y", "@formtrieb/cdf-mcp@^1.7.2"],
+      "env": {
+        "FIGMA_PAT": "figd_YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+Save as `<ds-repo>/.mcp.json`, restart CC, done. This is the
+"standard MCP config" pattern familiar from Claude Desktop's
+`claude_desktop_config.json`. The trade-off is that the PAT lives
+in a project file — make sure `.mcp.json` is gitignored (or use
+`${FIGMA_PAT}` interpolation here too and keep the actual token in
+the shell). Use this when shell-rc is awkward (shared dev machine,
+sandboxed env) and per-call args feel repetitive.
+
+### 3. Verify the PAT reached cdf-mcp
+
+Two layers can fail independently — the var being set in your
+shell, and the var being inherited by the MCP server. Check both:
+
+```bash
+# Layer 1 — is the PAT in the shell that launched CC?
+echo $FIGMA_PAT | cut -c1-5      # expect: figd_
+
+# Layer 2 — is the MCP server connected?
+claude mcp list | grep cdf-mcp   # expect: ✓ Connected
+```
+
+If Layer 1 shows `figd_` but Layer 2 shows `✗ Failed to connect`,
+fully quit CC (Cmd+Q) and relaunch — the MCP launcher only reads
+env at launch time. If Layer 2 shows `✓ Connected` but tool calls
+still error with auth, the PAT is wrong (scope, account, or
+expiry — see below).
+
+Then inside a Claude Code session in your DS dir:
 
 > Run `cdf_fetch_figma_file({ file_key: "abc123XYZ" })` against my
 > Figma file. (Substitute `abc123XYZ` with the file key from your
@@ -172,6 +260,10 @@ If you get `Forbidden` or `Unauthorized`:
   open the file in Figma to confirm the account.
 - The PAT expired — Figma PATs don't expire by default, but if you
   set an expiry on creation, regenerate.
+
+If you get `FIGMA_PAT not set` despite having it in your shell —
+the MCP launcher didn't inherit it. Most common cause: CC was
+already running when you set the var. Quit + relaunch.
 
 ### 4. Security notes
 
