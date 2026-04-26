@@ -11,6 +11,69 @@ and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 
 ---
 
+## 1.0.3 — 2026-04-26
+
+### Fixed — `FIGMA_PAT` not reaching the MCP server from the user's shell
+
+The plugin's `.mcp.json` did not explicitly forward `FIGMA_PAT` from
+the user's shell environment, so whether the env var reached cdf-mcp
+depended on Claude Code's MCP-launcher inheritance behavior. In real
+runs (Phase 4 validation against MoPla DS, 2026-04-26) the first
+`cdf_fetch_figma_file` call failed because the launcher didn't pass
+the var through, even though the user had `export FIGMA_PAT=...` set
+in their shell rc.
+
+`.mcp.json` now declares an explicit env passthrough:
+
+```json
+{
+  "mcpServers": {
+    "cdf-mcp": {
+      "command": "npx",
+      "args": ["-y", "@formtrieb/cdf-mcp@^1.7.2"],
+      "env": {
+        "FIGMA_PAT": "${FIGMA_PAT}"
+      }
+    }
+  }
+}
+```
+
+The `${FIGMA_PAT}` syntax interpolates at MCP launch time. If the
+shell var is set, cdf-mcp receives it; if not, it passes through as
+an empty string and cdf-mcp's existing actionable-error path fires
+(directing the user to set `FIGMA_PAT` or pass `pat:` arg).
+
+Behavioral effect for users: the README's "set `FIGMA_PAT` in your
+shell rc → it just works" promise now actually holds. The per-call
+`pat:` arg fallback (Option B in the README) was unaffected.
+
+### Fixed — `_quality: draft` schema annotation invalid on
+`findings_unclassified` list
+
+`snapshot.profile.schema.yaml` documented `_quality: draft` as a
+top-level marker on every best-effort section, but
+`findings_unclassified` is a YAML list — a sibling `_quality: draft`
+key produces a mixed scalar+list shape that breaks parsers. The
+schema now omits the marker on the list section and adds an explicit
+note that draft-status there is implicit via the soft-boundary
+position rather than an inline key. Mapping sections
+(`vocabularies`, `token_grammar`, `theming`, `interaction_a11y`)
+keep the inline marker — they're objects, where it's well-formed.
+
+Surfaced by Phase 4 MoPla validation run (2026-04-26).
+
+### Upgrade for existing installs
+
+```bash
+claude plugin marketplace update cdf
+claude plugin update cdf@cdf
+# Fully quit Claude Code (Cmd+Q) and relaunch — closing the window
+# is not enough; the MCP launcher needs to reload .mcp.json env.
+```
+
+---
+
 ## 1.0.2 — 2026-04-26
 
 ### Fixed — MCP server crash on startup with bootstrap `.cdf.config.yaml`

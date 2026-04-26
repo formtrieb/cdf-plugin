@@ -2,7 +2,10 @@
   "mcpServers": {
     "cdf-mcp": {
       "command": "npx",
-      "args": ["-y", "@formtrieb/cdf-mcp@^1.7.2"]
+      "args": ["-y", "@formtrieb/cdf-mcp@^1.7.2"],
+      "env": {
+        "FIGMA_PAT": "${FIGMA_PAT}"
+      }
     }
   }
 }

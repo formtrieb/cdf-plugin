@@ -36,7 +36,8 @@
 #   token_grammar     [llm-draft]             MEDIUM
 #   theming           [llm-draft]             MEDIUM-LOW
 #   interaction_a11y  [llm-draft]             LOW
-#   findings_unclassified [llm-draft]         LOW (max 15, flag-only)
+#   findings_unclassified [llm-draft]         LOW (max 15, flag-only,
+#                                                  list — no `_quality` key)
 #
 # Related:
 #   - Plan: docs/plans/active/2026-04-25-quick-look-mode.md (QL.A)
@@ -213,10 +214,16 @@ interaction_a11y:                                # OPTIONAL — Profile §10 sub
     # Heuristic-only; explicit "NOT VALIDATED" prefix REQUIRED.
 
 findings_unclassified:                           # OPTIONAL — sketch list, max 15
-  _quality: draft
   # [llm-draft] flag-only findings — what stood out during single-pass
   # synthesis. Production Scaffold's Phase 6 classifies these (block /
   # defer / adopt-as-divergence); Snapshot does NOT.
+  #
+  # NOTE — no `_quality: draft` key here. `_quality: draft` works only
+  # on mapping sections (vocabularies, token_grammar, theming,
+  # interaction_a11y). `findings_unclassified` is a list, so the marker
+  # would mix scalar + list and break YAML parsers. Draft status is
+  # already conveyed by this section's position below the soft-boundary
+  # in the section catalog (line 34) — implicit, not inline.
   # Hard cap: 15 findings. If more than 15 surface, prune to the most
   # signal-bearing — the Snapshot is "what evaluators should know
   # at a glance," not exhaustive.
