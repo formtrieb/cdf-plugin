@@ -83,9 +83,14 @@ cd ~/code/my-design-system
 
 # 3. Optional — seed a .cdf.config.yaml so the skill knows your
 #    Figma file and token-source regime up-front (see
-#    https://github.com/formtrieb/cdf#cdfconfigyaml-schema for shape)
+#    https://github.com/formtrieb/cdf#cdfconfigyaml-schema for shape).
+#    Note: leave `profile_path` commented out on first run — the
+#    scaffold writes the profile YAML mid-run and will set this line
+#    for you. Uncommenting before the file exists used to crash the
+#    MCP server (fixed in @formtrieb/cdf-core@1.0.3 + cdf plugin
+#    v1.0.2; warning still logged to be safe).
 cat > .cdf.config.yaml <<'EOF'
-profile_path: ./my-ds.profile.yaml
+# profile_path: ./my-ds.profile.yaml   # uncomment after first scaffold run
 token_sources: [./tokens/]
 scaffold:
   ds_name: my-ds

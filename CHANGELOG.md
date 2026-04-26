@@ -11,6 +11,54 @@ and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 
 ---
 
+## 1.0.2 — 2026-04-26
+
+### Fixed — MCP server crash on startup with bootstrap `.cdf.config.yaml`
+
+The MCP server crashed on startup (`MCP error -32000: Connection
+closed`) when the working directory contained a `.cdf.config.yaml`
+with `profile_path:` pointing to a not-yet-existing file. This is the
+**default state for new plugin users following the Quickstart** — the
+profile YAML is what `/cdf:scaffold-profile` will *produce*, so it
+doesn't exist before the first scaffold run. The fix lives upstream:
+
+- `@formtrieb/cdf-core@1.0.3` — `parseConfigFile` now skips profile
+  loading + emits a stderr warning when the file is missing, instead
+  of throwing.
+- `@formtrieb/cdf-mcp@1.7.2` — pins `^1.0.3` for clean dep refresh.
+- This plugin (`.mcp.json`) bumped from `^1.7.1` to `^1.7.2` to force
+  npx to re-resolve past stale `^1.7.1` cache entries.
+
+### Fixed — README Quickstart `.cdf.config.yaml` example pre-set
+`profile_path:` before the profile existed
+
+The Quickstart skeleton seeded `profile_path: ./my-ds.profile.yaml`
+into the config, then immediately invoked the MCP server (which would
+crash on the missing file). Even with the parser fix above, sequencing
+is cleaner if `profile_path` is set *after* the scaffold writes the
+profile. The Quickstart now shows `profile_path` as a commented-out
+line with a note explaining when to uncomment it; the scaffold can
+also auto-populate it on first run.
+
+### Upgrade for existing installs
+
+```bash
+claude plugin marketplace update cdf
+claude plugin update cdf@cdf
+# Restart Claude Code (Cmd+Q then relaunch — closing the window is not enough).
+```
+
+If the MCP still doesn't connect after that, clear the npx cache so
+any stale `^1.7.1` resolution is dropped:
+
+```bash
+rm -rf ~/.npm/_cacache/_npx ~/.npm/_cacache/index-v5/_npx
+```
+
+…then restart again.
+
+---
+
 ## 1.0.1 — 2026-04-26
 
 ### Fixed — MCP server fails to launch (`could not determine executable to run`)

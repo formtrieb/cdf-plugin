@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Component Description Format (CDF) skills for Claude Code — scaffold and snapshot CDF Profiles from a design system.",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "plugins": [
     {
       "name": "cdf",
       "source": "./",
       "description": "Two complementary CDF Profile skills: cdf-profile-scaffold (production-grade 7-phase) + cdf-profile-snapshot (5–10 min first-touch). Bundles @formtrieb/cdf-mcp via .mcp.json.",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "author": {
         "name": "at//design",
         "url": "https://github.com/formtrieb"
