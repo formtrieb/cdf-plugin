@@ -358,21 +358,39 @@ inspection happened — it didn't.
 no DS-MCP loaded AND no `tokens/` directory exists.** Figma Variables
 ARE the token system; treat
 `mcp__figma-console__figma_get_variables` as the canonical
-token-source probe — not as outlier-fallback. Budget on this path:
+token-source probe — not as outlier-fallback. Path 3 splits into two
+sub-paths depending on whether the Figma Desktop bridge is reachable:
 
-- **1× `figma_get_variables(format=summary)`** for collection / mode /
-  total-count enumeration (preferred — single round-trip, returns the
-  full collection list with mode names).
-- **1–3× `figma_get_variable_defs(nodeId)`** for per-component-binding
-  sampling, ONLY if a finding-level claim requires per-node binding
-  evidence.
+- **Sub-Path 3a (preferred)** — Desktop bridge reachable.
+  **1× `mcp__figma-console__figma_get_variables(format=summary)`**
+  returns full collection / mode / variable-name enumeration in a single
+  round-trip. Requires Figma Desktop with the target file open AND the
+  `figma-console` WebSocket bridge connected (operator-side
+  prerequisite). Budget: 1 call. This is the canonical Path 3 — when it
+  works, do not fall back. Optionally **1–3× `figma_get_variable_defs(nodeId)`**
+  for per-component-binding sampling ONLY if a finding-level claim
+  requires per-node binding evidence; both calls count against budget.
+- **Sub-Path 3b (fallback)** — Desktop bridge unreachable
+  (`figma-console.figma_get_status` errors, or `figma_get_variables`
+  fails with bridge-disconnected error). Substitute **3–5×
+  `mcp__figma__get_variable_defs(nodeId)`** against representative
+  button / chip / surface nodes as **sparse sampling** of variable
+  bindings. The official `figma` MCP (figma.com/dev-mode) does NOT
+  require Desktop and reads the file via REST. Budget: 3–5 calls.
+  **Document in `tool_survey:` as "sparse-sample fallback (Desktop
+  bridge unreachable)"** so the blind-spot is honest about coverage —
+  this path enumerates only the variables actually referenced by the
+  sampled nodes, not the full collection. Add a blind-spot:
+  `Snapshot used Sub-Path 3b sparse sampling — full Variables
+  collection enumeration deferred (~50–80% coverage estimate).`
 
 Do NOT use `format=full` or `resolveAliases=true` at the Snapshot stage
 — those are Production-Scaffold Phase-3 territory. Snapshot enumerates
 names + collection / mode structure; per-mode resolved values stay in
 the `Snapshot did not deep-resolve …` blind-spot. Path 3 is
 budget-equivalent to Path 1's single `browse_tokens` call: ONE
-structural enumeration probe, optional sparse evidence sampling.
+structural enumeration probe (Sub-Path 3a) OR sparse evidence sampling
+(Sub-Path 3b).
 
 If no token-MCP is available **and** no DTCG files are on disk **and**
 the regime is not `figma-variables`, set

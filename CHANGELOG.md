@@ -11,6 +11,78 @@ and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 
 ---
 
+## 1.0.8 — 2026-04-28
+
+Post-v1.0.7 runtime-smoke hot-fix wave: four Skill-doc-only fixes from
+the v1.0.7 runtime-smoke retro (15 items surfaced; 4 absorbed here, 11
+deferred to v1.8.0 Item 3). Doc-only release — no
+`@formtrieb/cdf-core` / `@formtrieb/cdf-mcp` version bumps;
+`.mcp.json` caret-pin unchanged.
+
+### Fixed (`cdf-profile-snapshot/SKILL.md` + `cdf-profile-scaffold/SKILL.md`)
+
+- **Bucket A (retro item 8)** — §0 batch-ToolSearch tip now uses the
+  correct plugin-namespaced selectors (`mcp__plugin_cdf_cdf-mcp__*`)
+  instead of the bare slugs that v1.0.7 shipped. v1.0.7 shipped
+  `select:cdf_fetch_figma_file,...` which did not match the actual
+  deferred-tool registrations — runtime-smoke reproducibly showed 4×
+  ToolSearch round-trips per session instead of 1×. New tip uses the
+  full `mcp__plugin_<plugin>_<server>__<tool>` form (8 selectors:
+  4× cdf-mcp + 2× figma + AskUserQuestion + TodoWrite), accompanied
+  by a paragraph explaining (a) why the namespace prefix is mandatory,
+  (b) the lazy-discovery first-MCP-call caveat, and (c) how
+  direct-`.mcp.json` users (uncommon for evaluators) substitute their
+  local server-name. Mirrors landed in both Skill files. Pre-ship R1
+  ToolSearch probe verified the 8-selector batch returns all schemas
+  in one round-trip — syntax + length both fine.
+
+### Fixed (`cdf-profile-snapshot/SKILL.md` only)
+
+- **Bucket C (retro item 10)** — §1 wall-time budget gains a DS-size
+  scaling table (`<50` / `50-100` / `100-200` / `>200` sets → 5 / 10
+  / 15 / 20+ min). The previous unqualified "5–10 min" promise broke
+  on Material 3 (175 sets, ~16 min actual). >200-set DSes get a
+  redirect to `cdf-profile-scaffold` directly. Citation to v1.8.0
+  `cdf_analyze_inventory` (~50% wall-time reduction expected once it
+  ships).
+
+### Fixed (`cdf-profile-snapshot/references/synthesis.md`)
+
+- **Bucket B (retro item 7)** — Contract 4 Path 3 (Figma-MCP
+  Variables) now refines into Sub-Path 3a (preferred — Desktop bridge
+  reachable, single `figma_get_variables(format=summary)` call) and
+  Sub-Path 3b (fallback — Desktop bridge unreachable, sparse
+  `figma__get_variable_defs(nodeId)` sampling against representative
+  button/chip/surface nodes, 3–5 calls). Sub-Path 3b mandates a
+  `tool_survey:` honesty annotation + an explicit blind-spot naming
+  the partial-coverage estimate, so Snapshot remains transparent
+  about coverage degradation. The v1.0.7 Material 3 run hit Sub-Path
+  3a "by luck" (Desktop bridge happened to be open); the doc now
+  prepares for the more-common case.
+
+### Fixed (`shared/cdf-source-discovery/source-discovery.md`)
+
+- **Bucket D (retro item 12)** — §6 file-output convention gains an
+  explicit "Filename prefix normalization" rule: `metadata.ds_name`
+  is lowercased + ASCII-only, with non-alphanumeric characters
+  replaced by `_`. Examples table covers the previously-ambiguous
+  `Material 3` (with space) → `material_3`, `MyCo-Brand` →
+  `myco_brand`, `acme.io` → `acme_io` cases. Non-Latin scripts
+  (Cyrillic / CJK) flagged as out-of-scope for v1.0.x — manual
+  transliteration required pending v1.8.0 helper.
+
+### Deferred to v1.8.0 Item 3
+
+Eleven retro items (1, 2, 3, 4, 5, 6, 9, 11, 13, 14, 15) cover larger
+architectural changes (walker-drift bridges merge, `token_regime`
+field, libraries.linked B5, vocab-collisions MCP, polymorphic-detect
+MCP, `--lint` mode, synthesis cheatsheet/restructure, inventory.pages
+info-loss, tool-discovery latency, `axis_count` semantic, config
+schema-drift validator) and are absorbed in
+`docs/plans/active/2026-04-26-v1.8.0-roadmap.md` Item 3.
+
+---
+
 ## 1.0.7 — 2026-04-27
 
 Post-v1.0.6 runtime-smoke hot-fix wave: six Skill-doc-only fixes from

@@ -331,6 +331,30 @@ the snapshot prefix at top-level (`<ds>.snapshot.profile.yaml`,
 `<ds>.snapshot.findings.md`). The convention is regime-of-artefact, not
 skill-of-origin.
 
+**Filename prefix normalization.** The `<ds>` prefix used in
+deliverable filenames is derived from `metadata.ds_name`, lowercased
+and ASCII-only — every non-alphanumeric character becomes `_`. This
+removes ambiguity when `ds_name` contains spaces, mixed case, or
+punctuation. Examples:
+
+| `metadata.ds_name` | Filename prefix |
+|---|---|
+| `material3` | `material3` |
+| `Material 3` | `material_3` |
+| `MyCo-Brand` | `myco_brand` |
+| `OpenAI` | `openai` |
+| `acme.io` | `acme_io` |
+
+Resulting filenames:
+`<prefix>.snapshot.profile.yaml`, `<prefix>.snapshot.findings.yaml`,
+`<prefix>.snapshot.findings.md` (Snapshot deliverables);
+`<prefix>.profile.yaml`, `<prefix>.findings.yaml`,
+`<prefix>.findings.md` (Production-Scaffold deliverables).
+
+Non-Latin scripts (Cyrillic / CJK) are out-of-scope for v1.0.x — if
+encountered, transliterate to closest ASCII manually before setting
+`metadata.ds_name`. v1.8.0 may formalize a transliteration helper.
+
 ---
 
 ## 7 · `.cdf.config.yaml` Discovery

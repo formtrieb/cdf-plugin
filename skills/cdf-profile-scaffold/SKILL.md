@@ -85,17 +85,38 @@ your Claude Code session — both `/cdf:scaffold-profile` and
 session to re-discover plugin components.
 
 **Tip — batch the deferred-tool schemas at session start.** Most
-runs use the same six tools across walker invocation + render +
-optional figma probes; load all schemas in one round-trip rather than
-lazy per-tool:
+runs use the same eight tools across walker invocation + render +
+optional figma probes + dialog/todo; load all schemas in one round-trip
+rather than lazy per-tool:
 
 ```
-ToolSearch(query="select:cdf_fetch_figma_file,cdf_extract_figma_file,cdf_render_snapshot,cdf_validate_profile,figma_get_status,figma_get_variables", max_results=10)
+ToolSearch(query="select:mcp__plugin_cdf_cdf-mcp__cdf_fetch_figma_file,mcp__plugin_cdf_cdf-mcp__cdf_extract_figma_file,mcp__plugin_cdf_cdf-mcp__cdf_render_snapshot,mcp__plugin_cdf_cdf-mcp__cdf_validate_profile,mcp__figma-console__figma_get_variables,mcp__figma__get_variable_defs,AskUserQuestion,TodoWrite", max_results=10)
 ```
+
+The `mcp__plugin_<plugin>_<server>__<tool>` namespace prefix is mandatory
+for plugin-loaded MCP-tool selectors — bare slugs (`cdf_fetch_figma_file`)
+do NOT match, and neither does the unqualified `mcp__<server>__<tool>`
+form. The `plugin_cdf` segment derives from the cdf plugin-name; the
+`cdf-mcp` segment is the server-name declared in the plugin's
+`.mcp.json`. Plugin-loaded tools are ALSO lazy-discovered: the first
+`cdf_fetch_figma_file` invocation at session start triggers the plugin's
+MCP-tool surface to register, after which subsequent ToolSearch matches
+succeed. **You may still see one ToolSearch round-trip on first MCP-tool
+call** even with this batch hint, because the plugin's tool surface is
+lazy. Subsequent calls within the session are batch-resolved.
+
+**If you installed `cdf-mcp` directly via `.mcp.json` instead of the
+cdf plugin** (uncommon for evaluators), substitute your local
+server-name as declared in that `.mcp.json`: the selector becomes
+`mcp__<your-server-name>__cdf_fetch_figma_file`. The selector pattern
+is `mcp__<configured-server-name>__<tool>` for direct installs, vs
+`mcp__plugin_<plugin>_<server>__<tool>` for plugin installs.
 
 Saves ~5 round-trips (~1–2 min) compared to lazy per-tool loading.
-If `max_results=10` returns truncated, fall back to two batches of
-three. Mirrors the same tip in `cdf-profile-snapshot/SKILL.md` §0.
+(v1.0.7 runtime-smoke retro item 8 — 4× ToolSearch round-trips per
+session because v1.0.7 shipped bare-slug names that did not match.)
+If `max_results=10` returns truncated, fall back to two batches of four.
+Mirrors the same tip in `cdf-profile-snapshot/SKILL.md` §0.
 
 ---
 
