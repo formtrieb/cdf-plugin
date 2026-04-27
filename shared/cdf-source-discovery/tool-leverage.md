@@ -428,6 +428,25 @@ This is **structural signal**, not detail-noise — it tells the reader
 the DS treats certain components as token-cascade-overrides distinct
 from the base grammar.
 
+### 4.2 — YAML extraction (mikefarah yq + jq)
+
+Mikefarah `yq` does NOT support inline jq-style object construction.
+For YAML→JSON→aggregation pipelines use:
+
+```bash
+# WRONG — yq's lexer rejects inline construction:
+yq '.foo | {bar: .baz}' file.yaml   # ❌
+
+# RIGHT — yq emits JSON, jq does the rest:
+yq -o=json '.foo' file.yaml | jq '{bar: .baz}'   # ✅
+yq -o=json '.' file.yaml | jq '.foo.bar | length'
+```
+
+This pattern is the canonical fallback when:
+- A YAML file exceeds the Read tool's 25k-token limit
+- You need aggregations / object construction over YAML data
+- The walker output (`phase-1-output.yaml`) needs selective drill-down
+
 ---
 
 ## 5 · Documentation-Surfaces Survey

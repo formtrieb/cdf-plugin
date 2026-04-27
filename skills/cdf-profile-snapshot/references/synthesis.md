@@ -40,6 +40,16 @@ Before drafting any section, you MUST have read:
    runtime adapter (T0) — `Phase1Output` is the contract, not the
    underlying serialisation. The walker output records `generated_by.tier`
    if you need to surface the mode in `metadata:`.
+
+   **Large-file fallback (>25k Read tokens).** If the walker output exceeds
+   the `Read` tool's 25,000-token limit (typical for DSes with ≥150
+   component_sets), fall back to `yq -o=json` + `jq` query patterns per
+   [`shared/cdf-source-discovery/tool-leverage.md` §4 — Extraction
+   Recipes](../../../shared/cdf-source-discovery/tool-leverage.md). The
+   synthesis contract (anchor every claim to walker evidence) STILL HOLDS;
+   only the read-strategy changes. Probe walker file size first
+   (`ls -lh .cdf-cache/phase-1-output.yaml`); branch directly to fallback
+   if >2 MB.
 2. **`.cdf.config.yaml`** (if present) — for `scaffold.ds_name`,
    `scaffold.figma.file_url`, `scaffold.tier`,
    `scaffold.token_source.regime`, `scaffold.resolver.mcp_name`. These
@@ -627,6 +637,31 @@ Modifier-name inference is heuristic. Add a blind-spot entry naming
 "theming axes inferred from variable-collection mode-names; not
 cross-validated against component usage" (verbatim from schema's
 suggested topics).
+
+**Fallback when `theming_matrix.collections: []` is empty.** If the
+walker emits an empty `theming_matrix.collections` (typical when
+`.cdf.config.yaml` has no explicit `resolver:` block but `regime:
+tokens-studio` is set and `tokens/$themes.json` exists on disk), the
+walker has not auto-resolved the theming-axes. Manual recovery:
+
+```bash
+# Surface theme-collection groups + member-counts:
+jq -r '
+  group_by(.group) | map({
+    group: .[0].group,
+    members: [.[] | .name]
+  })
+' tokens/\$themes.json
+```
+
+Each `group` becomes a theming-modifier; each `members[]` becomes its
+`contexts[]` value list. Cross-validate against component-side VARIANTS
+named after these axes (e.g. `device` axis → `device` VARIANT
+property).
+
+Walker auto-resolve queues for v1.8.0 (`cdf_extract_figma_file` will
+auto-fill `theming_matrix.collections` from `tokens/$themes.json` when
+`regime: tokens-studio`).
 
 ### 2.8 — `interaction_a11y` (OPTIONAL · `_quality: draft` · LOWEST trust)
 

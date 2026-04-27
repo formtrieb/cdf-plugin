@@ -87,6 +87,28 @@ session to re-discover plugin components.
 
 ---
 
+## §0.5 · Read-Path Resolution
+
+All `Read`/`yq`/`jq` paths in this skill and its `references/` + `shared/`
+docs resolve **relative to the directory containing this SKILL.md**, not
+relative to the user's `cwd`. Two consequences:
+
+1. **You can call `Read references/synthesis.md` directly.** No `ls`-
+   discovery needed. The Read tool resolves the relative path against
+   the SKILL.md base.
+2. **If a Read fails with "file does not exist"** because relative-path
+   resolution didn't pick up SKILL.md as anchor, locate the skill root
+   ONCE via `find ~/.claude/plugins -name SKILL.md -path "*<skill-name>*"`
+   and prefix subsequent reads with the resulting absolute path. Cache
+   the path; do NOT re-discover per Read.
+
+This anchor applies to:
+- `references/*.md` (skill-internal)
+- `../../shared/cdf-source-discovery/*.md` (shared refs)
+- `../../shared/<other>/...` (any future shared module)
+
+---
+
 ## §1 · Orchestration — Point-of-Need Reads (β-strict)
 
 The Snapshot is single-pass with four steps. Each step Reads the shared

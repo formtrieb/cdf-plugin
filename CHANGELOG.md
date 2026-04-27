@@ -11,6 +11,92 @@ and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 
 ---
 
+## 1.0.5 — 2026-04-27
+
+Post-V2 doc hot-fix wave: six doc-only fixes from the V2 MoPla Snapshot
+validation retro. Skill-content + plugin-manifest only release; no
+`@formtrieb/cdf-core` / `@formtrieb/cdf-mcp` version bumps.
+
+### Fixed
+
+- **A1** — both `SKILL.md` files gain a `§0.5 · Read-Path Resolution`
+  anchor clarifying that `Read` / `yq` / `jq` paths in the skill and
+  its `references/` + `shared/` docs resolve **relative to the
+  SKILL.md base**, not relative to the user's `cwd`. Eliminates the
+  `ls`-discovery friction observed in V2 first-touch runs and gives a
+  one-shot recovery instruction (`find ~/.claude/plugins -name
+  SKILL.md -path "*<skill-name>*"`) when the harness doesn't auto-
+  resolve the relative path.
+- **A2-doc** — `synthesis.md` §0 (Inputs) appends a *Large-file
+  fallback (>25k Read tokens)* paragraph cross-referencing the yq+jq
+  recipe in `tool-leverage.md` §4. Walker outputs exceeding the
+  25,000-token `Read` limit (typical for DSes with ≥150
+  component_sets) no longer block synthesis: the contract holds, only
+  the read-strategy changes. Probe walker file size first
+  (`ls -lh .cdf-cache/phase-1-output.yaml`); branch directly to
+  fallback if >2 MB.
+- **A3** — `tool-leverage.md` §4 adds a §4.2 *YAML extraction
+  (mikefarah yq + jq)* sub-section documenting the
+  `yq -o=json '...' file.yaml | jq '...'` pipe pattern. Mikefarah `yq`
+  rejects inline jq-style object construction (`yq '.foo | {bar:
+  .baz}'`); the pipe pattern is the canonical fallback. Includes
+  WRONG / RIGHT examples.
+- **A4** — `walker-invocation.md` §2 documents the
+  `total` ↔ `indexed_count` field-name drift between what the walker
+  emits (`ds_inventory.component_sets.total`) and what the snapshot
+  schema expects (`indexed_count`). Both refer to the same metric
+  (union of tree-resolved + remote-only sets); the alias-mapping is
+  authoritative until the walker rename ships in v1.8.0.
+- **A5-doc** — `synthesis.md` §2.7 (theming) appends a *Fallback when
+  `theming_matrix.collections: []` is empty* recipe. When the walker
+  emits an empty collections list (typical when `.cdf.config.yaml`
+  has no explicit `resolver:` block but `regime: tokens-studio` is
+  set and `tokens/$themes.json` exists on disk), operators can derive
+  theming-modifiers via a single `jq -r 'group_by(.group) | …'`
+  invocation against `tokens/$themes.json`. Cross-validation note
+  against component-side VARIANTS included.
+- **A6** — `walker-invocation.md` §2 adds an *Output-Shape Examples*
+  block for jq/yq query construction. Several walker fields emit
+  flat-string arrays (NOT object arrays) — `standalone_components.*`,
+  `pages.separators[]`, `libraries.linked[]`, `doc_frames_detected[]`.
+  Documents the WRONG `.utility[].name` (returns null) vs RIGHT
+  `.utility[]` query shapes.
+
+### Deferred to v1.8.0 (Synthesis-as-Code wave)
+
+- **A2-walker** — `cdf_extract_figma_file` `summary_only` mode emitting
+  `phase-1-summary.yaml` (drops inline `propertyDefinitions` for
+  >25k cases)
+- **A5-walker** — walker auto-resolves `theming_matrix.collections`
+  from `tokens/$themes.json` when `regime: tokens-studio` and no
+  explicit `resolver:` is configured
+- **A7** — Renderer hyphen-line-break lint (cosmetic)
+- **B5** — `libraries.linked` walker output bug — under fresh-chat
+  investigation in v1.8.0
+
+### Accepted as platform constant
+
+- **A8** — ToolSearch round-trip latency for first-time MCP tool
+  invocation. Documented in v1.0.4's `tool-leverage.md` §1
+  deferred-tool note; no further action.
+
+### No package version bumps in v1.0.5
+
+- `@formtrieb/cdf-core@1.0.x` and `@formtrieb/cdf-mcp@1.7.x` unchanged
+- `.mcp.json` still pins `@formtrieb/cdf-mcp@^1.7.2`
+- Skill-content + plugin-manifest only release
+
+### Upgrade for existing installs
+
+```bash
+claude plugin marketplace update cdf
+claude plugin update cdf@cdf
+# Fully quit Claude Code (Cmd+Q) and relaunch — closing the window
+# is not enough; the MCP launcher needs to reload .mcp.json env.
+```
+
+---
+
 ## 1.0.4 — 2026-04-27
 
 Snapshot stability bundle: 8 fixes (5 mechanical + 3 inhaltliche) from

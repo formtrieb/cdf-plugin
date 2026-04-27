@@ -88,6 +88,37 @@ tree-traversal:
 - `documentation_surfaces.figma_component_descriptions` — count + samples
 - `documentation_surfaces.doc_frames` — stage-1 name-pattern matches
 
+**Walker-output field-name drift (v1.7.x).** The walker emits
+`ds_inventory.component_sets.total` for the indexed count, but the
+snapshot schema expects `indexed_count`. Both refer to the same metric
+(union of tree-resolved + remote-only sets, currently 195 for MoPla).
+When mapping walker → snapshot, alias `total` → `indexed_count`. Walker
+field rename queued for v1.8.0; until then the alias-mapping is
+authoritative.
+
+### Output-Shape Examples (for jq/yq query construction)
+
+The walker emits flat-string arrays (NOT object arrays) for several
+fields:
+
+```yaml
+standalone_components:
+  utility: ["Backdrop"]                      # string[], NOT [{name: ...}]
+  documentation: ["docu/component-docu-header"]
+  widget: ["_Slot", "ColorCard", "Frame 26"]
+  asset: ["asset-pack-A", "asset-pack-B"]
+
+# WRONG query — assumes object-shape:
+yq '.standalone_components.utility[].name' phase-1.yaml  # ❌ returns null
+
+# RIGHT query — flat-string-array:
+yq '.standalone_components.utility[]' phase-1.yaml       # ✅
+```
+
+Other fields with flat-string-array shape: `pages.separators[]`,
+`libraries.linked[]` (currently empty — see B5 walker bug pending v1.8.0
+investigation), `doc_frames_detected[]`.
+
 The transformer on top:
 
 - Reshapes walker output to the `phase-1-output-v1` schema, keeping the
