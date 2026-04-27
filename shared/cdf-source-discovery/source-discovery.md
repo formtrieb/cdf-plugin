@@ -108,6 +108,26 @@ T0 via WebSocket bridge breaks the 5–10 min Snapshot budget; T1 via REST
      - `<ds-test-dir>/data/library.file.json` (common fetch default)
      - `<ds-test-dir>/figma-cache/library.file.json`
    → T1 from legacy cache.
+
+> **❌ DO NOT substitute a shell-env-existence check for step 3.** Probing
+> `echo $FIGMA_PAT` in the orchestrator shell is NOT a valid PAT-probe.
+> `.mcp.json` injects `env` ONLY into the MCP-server process —
+> `cdf-mcp` reads `process.env.FIGMA_PAT` from its own context, not the
+> orchestrator's shell. Designer-friendly setups (`.mcp.json` `env`
+> block) leave shell-env empty by design. The ONLY reliable probe is
+> calling `cdf_fetch_figma_file({file_key})` and reading the
+> `isError` payload — outcomes below.
+>
+> **Why the shortcut is tempting and wrong:** Shell-probe is a 50ms
+> mechanical check; `cdf_fetch_figma_file` is a ~3s network round-trip
+> on cache-miss. The 60× speed gap looks compelling. But the shell
+> answer is *systematically wrong* for `.mcp.json`-env users — it
+> reports "PAT missing" when the PAT is reachable to the tool that
+> would use it. Mechanical proxies that reverse the answer are worse
+> than waiting for the real probe. (Sister to Rule B's
+> `feedback_capability_probe_before_default` — shell-existence is the
+> classic mechanical-vs-survey anti-pattern in this domain.)
+
 3. **T1 modern probe** — call `cdf_fetch_figma_file({file_key})` (no PAT
    arg). The tool internally checks the modern cache at
    `<ds-root>/.cdf-cache/figma/<file_key>.json` first, then attempts a

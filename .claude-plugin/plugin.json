@@ -1,6 +1,6 @@
 {
   "name": "cdf",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Component Description Format (CDF) skills for Claude Code — scaffold and snapshot CDF Profiles from a design system (Figma + tokens). Bundles cdf-profile-scaffold (production-grade, 7-phase) + cdf-profile-snapshot (5–10 min first-touch).",
   "author": {
     "name": "at//design",

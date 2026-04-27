@@ -11,6 +11,108 @@ and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 
 ---
 
+## 1.0.7 — 2026-04-27
+
+Post-v1.0.6 runtime-smoke hot-fix wave: six Skill-doc-only fixes from
+the v1.0.6 Material 3 fresh-install retro (12 frictions surfaced; 6
+absorbed here, 5 deferred to v1.8.0 Item 3, 1 deferred to v1.9.0+).
+Doc-only release — no `@formtrieb/cdf-core` / `@formtrieb/cdf-mcp`
+version bumps; `.mcp.json` caret-pin unchanged.
+
+### Fixed (`shared/cdf-source-discovery/source-discovery.md`)
+
+- **Friction 1 (Bucket A)** — §2 Tier-Detection algorithm gains an
+  anti-shortcut callout above the T1-modern probe step: an
+  `❌ DO NOT substitute a shell-env-existence check for step 3`
+  block warning that `echo $FIGMA_PAT` is NOT a valid PAT-probe.
+  `.mcp.json` `env` blocks inject only into the MCP-server process —
+  shell-env is empty by design for designer-friendly setups. The
+  ONLY reliable probe is calling `cdf_fetch_figma_file({file_key})`
+  and reading the `isError` payload. Sister to Rule B's
+  `feedback_capability_probe_before_default` — shell-existence is
+  the classic mechanical-vs-survey anti-pattern.
+
+### Fixed (`cdf-profile-snapshot/references/synthesis.md`)
+
+- **Friction 4 (Bucket B)** — §0 large-file fallback gains an explicit
+  `❌`/`✅` yq inline-construction anti-pattern pair with the verbatim
+  lexer-error message (`Error: 1:6: lexer: invalid input text "field1, ..."`).
+  Mikefarah `yq` rejects inline object construction; the recipe now
+  prefixes "ALWAYS pipe `yq → jq`" and applies to ALL queries against
+  `phase-1-output.yaml`, not just the §0 fallback path. V1+V3 retro
+  item 1 reproduced in the v1.0.6 Material 3 run despite the §0
+  positive recipe — explicit anti-pattern closes the gap.
+- **Friction 4 extension (Bucket C)** — §2.2 gains a sibling
+  paste-ready aggregator for **walker top-level metadata**
+  (`schema_version`, `generated_at`, `generated_by`, `figma_file`,
+  `libraries`, `theming_matrix`, `token_regime`, `token_source`,
+  `seeded_findings`). Authors no longer hand-roll fresh `yq → jq`
+  for `metadata:` synthesis or seeded-findings review — V1+V3 item 1
+  reproduces in ad-hoc authoring without a canned aggregator. Defaults
+  (`(.libraries // {})`, `(.theming_matrix // {collections: []})`)
+  keep the query robust against figma-variables-regime omissions.
+- **Friction 3 (Bucket D)** — §2.2 `inventory:` aggregator extends
+  the `(.indexed_count // .total)` walker-drift bridge with a
+  `documentation_surfaces` bridge: when the v1.7.x walker emits flat
+  `figma_component_descriptions` + `doc_frames_info` (no wrapper),
+  the aggregator falls back to constructing the schema-expected
+  `documentation_surfaces` shape. Inner defaults (`with_description: 0`
+  etc.) keep synthesis green even when both flat AND wrapper are
+  absent. Walker auto-emit queues for v1.8.0; this alias keeps the
+  v1.0.7 → v1.8.0 window unblocked. Adjacent prose now consolidates
+  both bridges under a single "Walker-drift bridges in this aggregator"
+  heading.
+- **Friction 2 (Bucket E)** — §2.7 theming gains a parallel fallback
+  block for **`regime: figma-variables`** alongside the existing
+  `tokens-studio` fallback. Walker emits empty `theming_matrix.collections`
+  for figma-variables runs (auto-resolution queued for v1.8.0); the
+  inline fallback recovers via Path 3 of Contract 4 — single
+  `figma_get_variables(format=summary)` call enumerates collections +
+  modes. Budget shared with Path 3's token-source enumeration (NOT a
+  second call). Material 3 retro: 4 collections → modifiers + scope-
+  bound axes resolved without 3-doc-hop.
+- **Friction 8 (Bucket F)** — Contract 4 (TOKEN-MCP) gains a
+  consolidated probe-budget table immediately under the
+  Path-applicability intro paragraph. Single source-of-truth across
+  Contract 3-bis (Rule-A `tool_survey:`), Contract 4 (Path 1/2/3),
+  and `tool-leverage.md` §4.1 — "max calls", "counts against
+  Contract 4 budget?", "counts against Rule-A quota?" answered per
+  path in one place. Authors no longer triangulate three doc
+  locations to compute a budget.
+
+### Fixed (`shared/cdf-source-discovery/tool-leverage.md`)
+
+- **Friction 4 mirror (Bucket B)** — §4.2 (YAML extraction) gains the
+  same `❌`/`✅` anti-pattern + verbatim lexer-error block as
+  synthesis.md §0, plus the "Applies to ALL queries against
+  `phase-1-output.yaml`" prose. Two skills referencing the same
+  yq-vs-jq rule from two doc locations now share one canonical
+  pattern.
+
+### Deferred to v1.8.0 Item 3
+
+- Walker auto-fill `theming_matrix.collections` for
+  `regime: figma-variables` (Friction 2 walker-side).
+- New MCP tool `cdf_validate_snapshot` (Friction 6).
+- New MCP tool `cdf_query_phase1` (Friction 12).
+- §Z-frame-named investigation against M3-style files (Friction 9).
+- `synthesis.md` doc-restructure alongside Synthesis-as-Code rewrite
+  (Friction 7).
+
+### What didn't change
+
+Plugin-manifest only release for the doc-side; no
+`@formtrieb/cdf-core` / `@formtrieb/cdf-mcp` plugin-config changes
+— `.mcp.json`'s caret-pin keeps cdf-mcp 1.7.3 + cdf-core 1.0.4. All
+nine §"What NOT to touch" items from the v1.0.7 plan preserved (F10
+vocab-promotion thresholds, V1+V3 polymorphic-name demotion,
+Rule-A Contract 3-bis trigger-word list, B2 Path-3 Contract 4,
+B5 polymorphic-name guard, B7 git-rev-parse probe, §0 100-KB threshold,
+B1.b canned aggregator core, renderer telemetry shape + 15-finding cap,
+Track A "What this snapshot surfaced" block).
+
+---
+
 ## 1.0.6 — 2026-04-27
 
 Post-V1+V3 doc hot-fix wave: seven Skill-doc-only fixes from the V1+V3

@@ -430,8 +430,14 @@ from the base grammar.
 
 ### 4.2 — YAML extraction (mikefarah yq + jq)
 
-Mikefarah `yq` does NOT support inline jq-style object construction.
-For YAML→JSON→aggregation pipelines use:
+**❌ DO NOT inline-construct in `yq`.** mikefarah `yq`'s lexer rejects
+inline object construction. For YAML→JSON→aggregation pipelines use:
+
+❌ `yq -o=json '.<path> | {field1, field2}' file.yaml`
+   → `Error: 1:6: lexer: invalid input text "field1, ..."`
+
+✅ ALWAYS pipe `yq → jq` — emit JSON from `yq`, construct in `jq`:
+✅ `yq -o=json '.<path>' file.yaml | jq '{field1, field2}'`
 
 ```bash
 # WRONG — yq's lexer rejects inline construction:
@@ -441,6 +447,15 @@ yq '.foo | {bar: .baz}' file.yaml   # ❌
 yq -o=json '.foo' file.yaml | jq '{bar: .baz}'   # ✅
 yq -o=json '.' file.yaml | jq '.foo.bar | length'
 ```
+
+**Applies to ALL queries against `phase-1-output.yaml`**, not just the
+Snapshot §0 100-KB-fallback path. The mistake is tempting because
+Python `yq` (kislyuk/yq) DOES accept inline construction — but
+mikefarah `yq` (the variant declared in Snapshot §0 host-tool
+prerequisites) does not. If you author a fresh aggregator query and
+`yq` errors with `lexer: invalid input`, that's this anti-pattern
+firing — switch to `yq → jq` separation immediately, do not
+retry-with-quoting-tweaks.
 
 This pattern is the canonical fallback when:
 - A YAML file exceeds the Read tool's 25k-token limit

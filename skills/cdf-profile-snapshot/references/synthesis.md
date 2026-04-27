@@ -51,6 +51,23 @@ Before drafting any section, you MUST have read:
    yq -o=json '.<section>' .cdf-cache/phase-1-output.yaml | jq '.<aggregator>'
    ```
 
+   **❌ DO NOT inline-construct in `yq`.** mikefarah `yq`'s lexer rejects
+   inline object construction:
+
+   ❌ `yq -o=json '.<path> | {field1, field2}' file.yaml`
+      → `Error: 1:6: lexer: invalid input text "field1, ..."`
+
+   ✅ ALWAYS pipe `yq → jq` — emit JSON from `yq`, construct in `jq`:
+   ✅ `yq -o=json '.<path>' file.yaml | jq '{field1, field2}'`
+
+   **Applies to ALL queries against `phase-1-output.yaml`**, not just the
+   §0 100-KB-fallback path. The mistake is tempting because Python `yq`
+   (kislyuk/yq) DOES accept inline construction — but mikefarah `yq`
+   (the variant declared in §0 host-tool prerequisites) does not. If
+   you author a fresh aggregator query and `yq` errors with `lexer:
+   invalid input`, that's this anti-pattern firing — switch to
+   `yq → jq` separation immediately, do not retry-with-quoting-tweaks.
+
    The 100-KB threshold reproduces against any DS with ≥150 component
    sets (a 175-set DS produced 149 KB / 5475 lines; a 152-set DS
    produced ~28k tokens — both exceed the 25k-token Read cap). The
@@ -292,6 +309,24 @@ path** specifically — when a DS-specific tokens MCP is loaded
 you MAY make ONE `browse_tokens` call to inform `token_grammar:` +
 `inventory.tokens.total_tokens`. **ONE.**
 
+**Probe budget — consolidated across Contract 3-bis, Contract 4, and
+`tool-leverage.md` §4.1.** Below is the full per-path probe ledger. Use
+this table as the single source-of-truth; do NOT triangulate across
+the three sources for budget answers.
+
+| Path | Trigger | Max calls | Counts against Contract 4 budget? | Counts against Rule-A `tool_survey:` quota? |
+|---|---|---|---|---|
+| **Path 1** — DS-tokens-MCP `browse_tokens` | `mcp__<ds>-tokens__browse_tokens` visible OR `scaffold.resolver.mcp_name` set | **1** (depth=2 typical) | **YES** (the canonical Contract 4 cap) | NO |
+| **Path 2** — Filesystem-walk DTCG | `tokens/` dir on disk + DS-MCP absent | **unbounded** (depth-2 cap on `jq paths` recommended) | NO (filesystem path is budget-exempt — see §-block in `tool-leverage.md` §4.1) | NO |
+| **Path 3** — Figma-MCP Variables | `regime: figma-variables` AND DS-MCP absent AND `tokens/` absent | **1** `figma_get_variables(format=summary)` + **1–3** `figma_get_variable_defs(nodeId)` (sparse evidence sampling only) | **YES** (`format=summary` call counts; `get_variable_defs` calls count if invoked) | NO |
+| **Rule-A tool-survey** (Contract 3-bis) | Any blind-spot claim asserting capability gap of loaded MCP-tool surface | **As many as needed** to populate `tool_survey: {probed, result, tools_not_probed}` (Contract 3-bis floor: 1 per gap-claim) | NO (Rule-A probes are budget-exempt — they qualify a blind-spot, not the synthesis-content) | YES (the probes ARE the survey) |
+
+**Forbidden across all paths** (already in Contract 4 prose, repeated
+for table-completeness): multi-call `browse_tokens` analysis loops;
+`resolve_token` per-leaf; `compose_theme` / `find_placeholders` /
+`check_design_rules` / `compare_themes` (audit tools, not Snapshot
+tools); `format=full` or `resolveAliases=true` on Path 3.
+
 In the **filesystem-walk fallback path** (no DS-tokens MCP loaded, but
 DTCG/Tokens-Studio JSON files exist on disk), path-level enumeration is
 **encouraged, not budget-bound** — emit at minimum set-level + top-level
@@ -479,7 +514,10 @@ yq -o=json '.ds_inventory' .cdf-cache/phase-1-output.yaml | jq '{
     widget: (.standalone_components.widget | length // 0),
     asset: (.standalone_components.asset | length // 0)
   },
-  documentation_surfaces: .documentation_surfaces,
+  documentation_surfaces: (.documentation_surfaces // {
+    figma_component_descriptions: (.figma_component_descriptions // {with_description: 0, without_description: 0, ratio: 0}),
+    doc_frames_detected: (.doc_frames_info.count // 0)
+  }),
   tokens: {
     enumeration_method: .tokens.enumeration_method,
     total_tokens: .tokens.total_tokens
@@ -487,12 +525,49 @@ yq -o=json '.ds_inventory' .cdf-cache/phase-1-output.yaml | jq '{
 }'
 ```
 
-Note `(.component_sets.indexed_count // .component_sets.total)` — that
-alias accommodates the v1.7.x walker drift documented in
-[`walker-invocation.md` §2](../../../shared/cdf-source-discovery/walker-invocation.md)
-until the v1.8.0 alias-bridge lands. Falls back to `.total` when
-`.indexed_count` is absent so the snapshot succeeds against either
-walker version.
+**Walker-drift bridges in this aggregator** (sister to v1.0.6's
+`(.indexed_count // .total)`):
+
+- `(.component_sets.indexed_count // .component_sets.total)` — bridges
+  v1.7.x walker's `total` field rename to `indexed_count`. Documented
+  in [`walker-invocation.md` §2](../../../shared/cdf-source-discovery/walker-invocation.md);
+  falls back to `.total` when `.indexed_count` is absent so the snapshot
+  succeeds against either walker version. Sunsets when v1.8.0
+  alias-bridge lands.
+- `(.documentation_surfaces // {figma_component_descriptions: ..., doc_frames_detected: ...})` —
+  bridges v1.7.x walker's flat `figma_component_descriptions` +
+  `doc_frames_info` to the schema-expected `documentation_surfaces`
+  wrapper. Walker auto-emit queues for v1.8.0; until then this alias
+  keeps `inventory:` synthesis green against the live walker. Inner
+  `// {with_description: 0, ...}` defaults trigger when neither flat
+  fields NOR wrapper exist — synthesis still completes (with 0-counts
+  surfaced as a documentation-blind-spot finding).
+
+**Walker top-level metadata aggregator — paste-ready (sibling to the
+`ds_inventory` aggregator above).** Use this when you need
+walker-top-level fields for `metadata:` synthesis or seeded-findings
+review, NOT another hand-rolled query (V1+V3 item 1 reproduces in
+ad-hoc authoring):
+
+```bash
+yq -o=json '.' .cdf-cache/phase-1-output.yaml | jq '{
+  schema_version: .schema_version,
+  generated_at: .generated_at,
+  generated_by: .generated_by,
+  figma_file: .figma_file,
+  libraries: (.libraries // {}),
+  theming_matrix: (.theming_matrix // {collections: []}),
+  token_regime: .token_regime,
+  token_source: .token_source,
+  seeded_findings_count: (.seeded_findings | length // 0),
+  seeded_findings: (.seeded_findings // [])
+}'
+```
+
+Note the `(.libraries // {})` and `(.theming_matrix // {collections: []})`
+defaults — older walker versions OR figma-variables-regime runs may
+omit the field entirely; the default keeps downstream synthesis
+robust against absence.
 
 **T0/T1 inventory-semantic note (F12).** If both T0 (runtime walker) and
 T1 (REST walker) artefacts are available — e.g. tier-detection ran a
@@ -760,6 +835,34 @@ property).
 Walker auto-resolve queues for v1.8.0 (`cdf_extract_figma_file` will
 auto-fill `theming_matrix.collections` from `tokens/$themes.json` when
 `regime: tokens-studio`).
+
+**Fallback when `theming_matrix.collections: []` is empty AND
+`regime: figma-variables`** (sister to the `tokens-studio` fallback
+above; resolved inline rather than via 3-doc-hop). The walker has not
+auto-resolved theming-axes from the Figma Variables collections (queued
+for v1.8.0 walker work). Recover via Path 3 of Contract 4:
+
+```
+mcp__figma-console__figma_get_variables({format: "summary"})
+```
+
+Each collection in the response becomes a theming-modifier; each mode
+becomes its `contexts[]` value list. Worked example: a 4-collection
+Variables file (e.g. one M3 mode pair Light/Dark, one font theme pair
+Plain/Expressive, plus single-mode Typescale and Shape collections) →
+modifiers `color_scheme: [light, dark]` + `font_theme: [plain,
+expressive]` (Typescale and Shape have one mode each — surface as
+scope-bound, not modifier-axes).
+
+Budget: this is the SAME single `figma_get_variables(format=summary)`
+call that Contract 4 Path 3 budgets — it covers token-source
+enumeration AND theming-axis recovery in one round-trip. Do NOT issue
+a second call for theming.
+
+Walker auto-resolve queues for v1.8.0 (`cdf_extract_figma_file` will
+auto-fill `theming_matrix.collections` from `figma_get_variables`
+when `regime: figma-variables`). Until then this fallback is
+load-bearing for figma-variables-regime DSes.
 
 ### 2.8 — `interaction_a11y` (OPTIONAL · `_quality: draft` · LOWEST trust)
 
