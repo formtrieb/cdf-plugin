@@ -11,6 +11,76 @@ and [`@formtrieb/cdf-mcp`](https://github.com/formtrieb/cdf-mcp) versions
 
 ---
 
+## 1.0.6 — 2026-04-27
+
+Post-V1+V3 doc hot-fix wave: seven Skill-doc-only fixes from the V1+V3
+Material 3 retro. Ships in coordination with
+[`@formtrieb/cdf-mcp` v1.7.3](https://github.com/formtrieb/cdf-mcp/releases/tag/v1.7.3)
+(Renderer "What this snapshot surfaced" block — V1+V3 retro item 10);
+the plugin's `.mcp.json` caret-pin `^1.7.2` picks up 1.7.3 transparently
+on next `npx` resolution.
+
+### Fixed (`cdf-profile-snapshot`)
+
+- **Item 3 + 4** — `synthesis.md` §0 fallback threshold tightened from
+  2 MB to **100 KB OR 2000 lines** (Read-tool 25k-token cap calibration);
+  the `yq -o=json | jq` recipe is now inlined directly in §0 rather than
+  cross-linked. §2.2 `inventory:` section gains a paste-ready canned
+  aggregator query so authors do NOT hand-roll fresh jq for every
+  large-DS run. The aggregator includes
+  `(.indexed_count // .total)` to bridge the v1.7.x walker drift until
+  v1.8.0 alias-bridge lands.
+- **Item 5** — `synthesis.md` Contract 4 (TOKEN-MCP) gains a third
+  allowed path: **Path 3 (Figma-MCP Variables)** for
+  `regime: figma-variables` with no DS-MCP loaded. Path-3 makes
+  `figma_get_variables(format=summary)` canonical (single round-trip
+  collection/mode enumeration), not outlier-fallback. Treated as
+  budget-equivalent to Path 1's single `browse_tokens` call.
+- **Item 1** — yq lexer recipe inlined in §0 directly (resolved
+  alongside Item 3 + 4 — the threshold-tighten edit embedded the
+  recipe verbatim).
+- **Item 7** — `SKILL.md` §1.4 directive: **Maximum 1
+  `AskUserQuestion` at session start**; identifier + parent-Profile
+  combine into one multi-field question; tier-probe is mechanically
+  deterministic — run the §1 algorithm, *report* the tier, do NOT
+  ask the User to confirm.
+- **Item 8** — `synthesis.md` §2.5 gains a **demotion rule** symmetric
+  to F10's promotion rules: properties named `Type` / `Style` /
+  `Configuration` / `Layout` / `Variant` (or close lexical variants)
+  with ≥20 distinct values spanning multiple semantic clusters
+  surface as findings, NOT as `vocabularies` entries (catches the
+  polymorphic per-component-role case where a 59-value `Type` axis
+  is the union of disjoint role-sets).
+- **Item 9** — both `SKILL.md` files (snapshot + scaffold) gain a §0
+  tip recommending **batch `ToolSearch` at session start** —
+  `select:cdf_fetch_figma_file,cdf_extract_figma_file,cdf_render_snapshot,cdf_validate_profile,figma_get_status,figma_get_variables`.
+  Saves ~5 round-trips compared to lazy per-tool loading. Documents
+  the two-batches-of-three fallback if `max_results=10` returns
+  truncated.
+
+### Fixed (`shared/cdf-source-discovery`)
+
+- **Item 13** — `source-discovery.md` §6 `.gitignore` recommendation
+  is now precondition-gated. Probe with
+  `git rev-parse --is-inside-work-tree 2>/dev/null` — if the
+  DS-test-dir is not git-tracked (typical for `~/Desktop/<scratch>/`,
+  `/tmp/...` evaluation runs), skip the offer entirely. Both SKILL.md
+  files declare `git` as a host-tool prerequisite alongside
+  `yq`/`jq`/`python3`.
+
+### What didn't change
+
+Plugin-manifest only release for the doc-side; no
+`@formtrieb/cdf-core` / `@formtrieb/cdf-mcp` plugin-config changes —
+`.mcp.json`'s caret-pin pulls in cdf-mcp 1.7.3 + cdf-core 1.0.4 on
+next npx resolution (may need `~/.npm/_npx/` clear if cache is stale,
+same caveat as 1.0.5's bump). All six §"What NOT to touch" items from
+the v1.0.6 plan preserved (probe-first tier-detection, Contract 3-bis
+tool-survey, walker auto-seeding, Phase1Output source-of-truth
+contract, `cdf_render_snapshot` telemetry shape, hard 15-finding cap).
+
+---
+
 ## 1.0.5 — 2026-04-27
 
 Post-V2 doc hot-fix wave: six doc-only fixes from the V2 MoPla Snapshot

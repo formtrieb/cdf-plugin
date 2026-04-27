@@ -56,6 +56,7 @@ this skill.)
 | `jq` | any modern | `brew install jq` / `apt install jq` |
 | `python3` | stdlib only — no PyYAML needed | usually pre-installed; `brew install python3` if not |
 | Bash 4+ or zsh | any modern | macOS 11+/Linux: pre-installed |
+| `git` | any modern | usually pre-installed; needed for the `.gitignore`-offer probe (`source-discovery.md` §6) |
 
 To verify your environment in one shot:
 
@@ -84,6 +85,20 @@ prints `MISSING: <tool>` on the first absent dependency.
 your Claude Code session — both `/cdf:scaffold-profile` and
 `/cdf:snapshot-profile` should appear. If they don't, restart the CC
 session to re-discover plugin components.
+
+**Tip — batch the deferred-tool schemas at session start.** Most
+snapshots use the same six tools across walker invocation + render +
+optional figma probes; load all schemas in one round-trip rather than
+lazy per-tool:
+
+```
+ToolSearch(query="select:cdf_fetch_figma_file,cdf_extract_figma_file,cdf_render_snapshot,cdf_validate_profile,figma_get_status,figma_get_variables", max_results=10)
+```
+
+Saves ~5 round-trips (~1–2 min) compared to lazy per-tool loading.
+(V1+V3 retro item 9 — seven scattered ToolSearch calls collapsed into
+one batch.) If `max_results=10` returns truncated, fall back to two
+batches of three.
 
 ---
 
@@ -169,6 +184,13 @@ The shared checklist asks about:
 established source-discovery state — does NOT write its own config
 block in this spike). The `scaffold.tier:` field (T0/T1/T2) determines
 which `cdf_extract_figma_file` source-mode to invoke — see §1.4 above.
+
+**Maximum 1 `AskUserQuestion` at session start.** Combine identifier +
+parent-Profile into a single multi-field question; the tier-probe is
+mechanically deterministic — run the §1 / `tool-leverage.md` §3
+probe-then-decide algorithm, *report* the resolved tier, do NOT ask
+the User to confirm tier choice. (V1+V3 retro item 7: three opening
+questions was one too many; the probe is the algorithm.)
 
 ---
 

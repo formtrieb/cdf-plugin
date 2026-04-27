@@ -290,6 +290,21 @@ Mirrors the `node_modules/` / `.next/` / `.cache/` family of
 regenerable-cache conventions; one line in `.gitignore` covers all skill
 cache output.
 
+**Skip the `.gitignore` offer when not inside a git repo.** Probe with:
+
+```bash
+git rev-parse --is-inside-work-tree 2>/dev/null
+```
+
+If the command exits non-zero or prints nothing, the DS-test-dir is not
+git-tracked and the `.gitignore` line would be wasted text. Skip the
+offer entirely — surfacing it in non-git dirs (e.g. `/tmp/...`,
+`~/Desktop/<scratch>/`) was a V1+V3 retro item 13 friction; the env
+already reports `Is a git repository: false` in those cases. The probe
+is a single `git` invocation; `git` is declared in
+`/cdf-profile-snapshot/SKILL.md` §0 host-tool prerequisites alongside
+`yq`/`jq`/`python3` so the probe is host-dep-safe.
+
 **Snapshot-style skills:** still place ephemeral intermediates under
 `.cdf-cache/` (e.g. raw walker output) and emit their own deliverables with
 the snapshot prefix at top-level (`<ds>.snapshot.profile.yaml`,

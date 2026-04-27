@@ -41,15 +41,28 @@ Before drafting any section, you MUST have read:
    underlying serialisation. The walker output records `generated_by.tier`
    if you need to surface the mode in `metadata:`.
 
-   **Large-file fallback (>25k Read tokens).** If the walker output exceeds
-   the `Read` tool's 25,000-token limit (typical for DSes with ≥150
-   component_sets), fall back to `yq -o=json` + `jq` query patterns per
+   **Large-file fallback (Read-tool 25k-token cap).** Probe walker file size
+   first (`ls -lh .cdf-cache/phase-1-output.yaml`; `wc -l` the same file).
+   If `phase-1-output.yaml` exceeds **100 KB OR 2000 lines**, use the
+   YAML-pipe fallback directly — do NOT attempt `Read` and "improvise +
+   chunk":
+
+   ```bash
+   yq -o=json '.<section>' .cdf-cache/phase-1-output.yaml | jq '.<aggregator>'
+   ```
+
+   The 100-KB threshold reproduces against any DS with ≥150 component
+   sets (a 175-set DS produced 149 KB / 5475 lines; a 152-set DS
+   produced ~28k tokens — both exceed the 25k-token Read cap). The
+   previous 2-MB threshold was too lax — it pushed authors into chunking
+   attempts that wasted ~3 min before falling back. See `inventory:`
+   aggregator block in §2.2 for a paste-ready query covering every field
+   the synthesis needs from `ds_inventory`. Cross-references in
    [`shared/cdf-source-discovery/tool-leverage.md` §4 — Extraction
-   Recipes](../../../shared/cdf-source-discovery/tool-leverage.md). The
-   synthesis contract (anchor every claim to walker evidence) STILL HOLDS;
-   only the read-strategy changes. Probe walker file size first
-   (`ls -lh .cdf-cache/phase-1-output.yaml`); branch directly to fallback
-   if >2 MB.
+   Recipes](../../../shared/cdf-source-discovery/tool-leverage.md) cover
+   token enumeration + DTCG paths; this paragraph is self-contained for
+   `phase-1-output.yaml`. The synthesis contract (anchor every claim to
+   walker evidence) STILL HOLDS; only the read-strategy changes.
 2. **`.cdf.config.yaml`** (if present) — for `scaffold.ds_name`,
    `scaffold.figma.file_url`, `scaffold.tier`,
    `scaffold.token_source.regime`, `scaffold.resolver.mcp_name`. These
@@ -306,7 +319,28 @@ result into prose-form summary inside `token_grammar:` entries'
 results into multiple `token_grammar` entries that imply per-leaf
 inspection happened — it didn't.
 
-If no token-MCP is available **and** no DTCG files are on disk, set
+**Path 3 (Figma-MCP Variables) — when `regime: figma-variables` AND
+no DS-MCP loaded AND no `tokens/` directory exists.** Figma Variables
+ARE the token system; treat
+`mcp__figma-console__figma_get_variables` as the canonical
+token-source probe — not as outlier-fallback. Budget on this path:
+
+- **1× `figma_get_variables(format=summary)`** for collection / mode /
+  total-count enumeration (preferred — single round-trip, returns the
+  full collection list with mode names).
+- **1–3× `figma_get_variable_defs(nodeId)`** for per-component-binding
+  sampling, ONLY if a finding-level claim requires per-node binding
+  evidence.
+
+Do NOT use `format=full` or `resolveAliases=true` at the Snapshot stage
+— those are Production-Scaffold Phase-3 territory. Snapshot enumerates
+names + collection / mode structure; per-mode resolved values stay in
+the `Snapshot did not deep-resolve …` blind-spot. Path 3 is
+budget-equivalent to Path 1's single `browse_tokens` call: ONE
+structural enumeration probe, optional sparse evidence sampling.
+
+If no token-MCP is available **and** no DTCG files are on disk **and**
+the regime is not `figma-variables`, set
 `inventory.tokens.enumeration_method: walker_only` (or `none`) and emit
 `token_grammar:` only when grammars are inferable from token PATHS
 visible in `phase-1-output.yaml`. Add a blind-spot naming the missing
@@ -425,6 +459,40 @@ token-MCP, set `enumeration_method: none` and `total_tokens: null`.
 Citation rule: every numeric value here MUST trace to a walker field
 of the same name. The schema annotates each as `[walker]` for exactly
 this reason — copy, don't compute.
+
+**Inventory aggregator — paste-ready (large-file path).** When §0's
+100-KB / 2000-line threshold fires, do NOT hand-author a fresh jq
+query. Use this canned aggregator — it produces every field the
+`inventory:` block needs from `ds_inventory` in one round-trip:
+
+```bash
+yq -o=json '.ds_inventory' .cdf-cache/phase-1-output.yaml | jq '{
+  pages: {total: .pages.total, content: .pages.content},
+  component_sets: {
+    tree_unique_count: .component_sets.tree_unique_count,
+    indexed_count: (.component_sets.indexed_count // .component_sets.total),
+    remote_only_count: .component_sets.remote_only_count
+  },
+  standalone_components: {
+    utility: (.standalone_components.utility | length // 0),
+    documentation: (.standalone_components.documentation | length // 0),
+    widget: (.standalone_components.widget | length // 0),
+    asset: (.standalone_components.asset | length // 0)
+  },
+  documentation_surfaces: .documentation_surfaces,
+  tokens: {
+    enumeration_method: .tokens.enumeration_method,
+    total_tokens: .tokens.total_tokens
+  }
+}'
+```
+
+Note `(.component_sets.indexed_count // .component_sets.total)` — that
+alias accommodates the v1.7.x walker drift documented in
+[`walker-invocation.md` §2](../../../shared/cdf-source-discovery/walker-invocation.md)
+until the v1.8.0 alias-bridge lands. Falls back to `.total` when
+`.indexed_count` is absent so the snapshot succeeds against either
+walker version.
 
 **T0/T1 inventory-semantic note (F12).** If both T0 (runtime walker) and
 T1 (REST walker) artefacts are available — e.g. tier-detection ran a
@@ -572,6 +640,36 @@ promote it later if appropriate. Snapshot's promotion rules are
 quality control. R6 mitigation: if Snapshot output surfaces obvious junk
 vocabs (e.g. one-off color modifiers, internal property-name leaks),
 the threshold should re-tighten on next iteration.
+
+#### Demotion rule — polymorphic-name guard (V1+V3 retro item 8)
+
+F10 promotes generously; this clause catches the symmetric failure mode —
+generic-named **per-component-role** properties that look like vocabularies
+but resolve to disjoint role-sets per component. **Demote to a finding,
+NOT a vocabulary entry**, when ALL THREE conditions hold:
+
+1. **Property name** ∈ {`Type`, `Style`, `Configuration`, `Layout`,
+   `Variant`} OR a close lexical variant.
+2. **Value-set size** ≥ 20 distinct values across the union.
+3. **Cross-cluster shape** — the values span multiple semantic clusters
+   (e.g. button hierarchies + chip styles + image fits + color-scheme
+   aliases all under one axis), not one homogeneous concept.
+
+All three required: a 25-value `Type` axis on chips alone is a vocabulary
+(homogeneous role-set), but a 59-value `Type` spanning Day-Picker / Filter
+Chip / Avatar / Modal / Banner is the polymorphic case this clause
+catches. Surface as:
+
+```yaml
+findings_unclassified:
+  - topic: "`<Property>` is a polymorphic per-component property, not a global vocabulary"
+    observation: "<N> component sets share a `<Property>` variant property, but its <M>-value union is the union of disjoint per-component role-sets — <name1> uses [<sample-3>], <name2> uses [<sample-3>], <name3> uses [<sample-3>]. Production Scaffold Phase-2 will surface as N per-component vocabularies (or accept-as-divergence)."
+    evidence_path: "ds_inventory.component_sets.entries[].propertyDefinitions.<Property>.variantOptions"
+```
+
+This complements F10's promotion rules: promotion catches missed vocabs;
+demotion catches over-promoted vocabs. Both work the same evidence (the
+`variantOptions` map across all sets) — just different failure modes.
 
 #### Citation rule (unchanged)
 

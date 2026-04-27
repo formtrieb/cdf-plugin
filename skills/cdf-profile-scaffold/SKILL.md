@@ -51,6 +51,7 @@ inline-jq recipes Phase 3 uses.)
 | `jq` | any modern | `brew install jq` / `apt install jq` |
 | `python3` | stdlib only — no PyYAML needed | usually pre-installed; `brew install python3` if not |
 | Bash 4+ or zsh | any modern | macOS 11+/Linux: pre-installed |
+| `git` | any modern | usually pre-installed; needed for the `.gitignore`-offer probe (`source-discovery.md` §6) |
 
 To verify your environment in one shot:
 
@@ -82,6 +83,19 @@ applies — see §1.4 below; this list is here so you can pre-configure):
 your Claude Code session — both `/cdf:scaffold-profile` and
 `/cdf:snapshot-profile` should appear. If they don't, restart the CC
 session to re-discover plugin components.
+
+**Tip — batch the deferred-tool schemas at session start.** Most
+runs use the same six tools across walker invocation + render +
+optional figma probes; load all schemas in one round-trip rather than
+lazy per-tool:
+
+```
+ToolSearch(query="select:cdf_fetch_figma_file,cdf_extract_figma_file,cdf_render_snapshot,cdf_validate_profile,figma_get_status,figma_get_variables", max_results=10)
+```
+
+Saves ~5 round-trips (~1–2 min) compared to lazy per-tool loading.
+If `max_results=10` returns truncated, fall back to two batches of
+three. Mirrors the same tip in `cdf-profile-snapshot/SKILL.md` §0.
 
 ---
 
